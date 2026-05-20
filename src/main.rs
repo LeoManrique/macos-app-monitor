@@ -5,9 +5,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
-    div, prelude::*, px, rgb, size, uniform_list, Application, Context, MouseButton, SharedString,
-    Window, WindowBounds, WindowOptions,
+    actions, div, prelude::*, px, rgb, size, uniform_list, Application, Context, KeyBinding, Menu,
+    MenuItem, MouseButton, SharedString, Window, WindowBounds, WindowOptions,
 };
+
+actions!(
+    activity_monitor,
+    [Quit, HideApp, Minimize, Zoom, ToggleFullscreen]
+);
 use sysinfo::{ProcessesToUpdate, System};
 
 #[repr(C)]
@@ -389,10 +394,55 @@ fn main() {
             window_bounds: Some(WindowBounds::centered(window_size, cx)),
             ..Default::default()
         };
-        cx.open_window(options, |_window, cx| {
-            cx.new(|cx| ProcessMonitor::new(cx))
-        })
-        .unwrap();
+        let window = cx
+            .open_window(options, |_window, cx| cx.new(|cx| ProcessMonitor::new(cx)))
+            .unwrap();
+
+        cx.bind_keys([
+            KeyBinding::new("cmd-q", Quit, None),
+            KeyBinding::new("cmd-h", HideApp, None),
+            KeyBinding::new("cmd-m", Minimize, None),
+            KeyBinding::new("ctrl-cmd-f", ToggleFullscreen, None),
+        ]);
+
+        cx.on_action(|_: &Quit, cx| cx.quit());
+        cx.on_action(|_: &HideApp, cx| cx.hide());
+        cx.on_action(move |_: &Minimize, cx| {
+            window
+                .update(cx, |_, window, _| window.minimize_window())
+                .ok();
+        });
+        cx.on_action(move |_: &Zoom, cx| {
+            window
+                .update(cx, |_, window, _| window.zoom_window())
+                .ok();
+        });
+        cx.on_action(move |_: &ToggleFullscreen, cx| {
+            window
+                .update(cx, |_, window, _| window.toggle_fullscreen())
+                .ok();
+        });
+
+        cx.set_menus(vec![
+            Menu {
+                name: "Activity Monitor".into(),
+                items: vec![
+                    MenuItem::action("Hide Activity Monitor", HideApp),
+                    MenuItem::separator(),
+                    MenuItem::action("Quit Activity Monitor", Quit),
+                ],
+            },
+            Menu {
+                name: "Window".into(),
+                items: vec![
+                    MenuItem::action("Minimize", Minimize),
+                    MenuItem::action("Zoom", Zoom),
+                    MenuItem::separator(),
+                    MenuItem::action("Enter Full Screen", ToggleFullscreen),
+                ],
+            },
+        ]);
+
         cx.activate(true);
     });
 }
