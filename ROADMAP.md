@@ -7,10 +7,10 @@
 - [x] Expand / collapse multi-process groups
 - [x] Auto-refresh every 2 s, sorted by memory
 - [x] Centered 50% × 70% window
+- [x] MacOS native shortcuts (e.g. Cmd+Q)
 
 ## Next
 
-- [ ] MacOS native shortcuts (e.g. Cmd+Q)
 - [ ] CPU column (per process and per group)
 - [ ] Search / filter box
 - [ ] Click column headers to change sort
