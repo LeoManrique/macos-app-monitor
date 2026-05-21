@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 gpui = { package = "gpui-ce", version = "0.3" }
 sysinfo = "0.38"
+icns = "0.4"
+plist = "1"
 
 [profile.dev]
 opt-level = 1

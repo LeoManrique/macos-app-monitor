@@ -8,15 +8,17 @@
 - [x] Auto-refresh every 2 s, sorted by memory
 - [x] Centered 50% × 70% window
 - [x] MacOS native shortcuts (e.g. Cmd+Q)
+- [x] Activity-Monitor-aligned styling: zebra rows, disclosure triangles, refined palette
+- [x] CPU column (per process and per group)
+- [x] Click column headers to change sort
+- [x] General stats (total memory / CPU / disk usage)
+- [x] App icons next to group names
 
 ## Next
 
-- [ ] CPU column (per process and per group)
 - [ ] Search / filter box
-- [ ] Click column headers to change sort
 - [ ] Memory-over-time sparkline per app
-- [ ] Better styling / spacing consistency
-- [ ] App icons next to group names
 - [ ] Right-click "Quit" / "Force Quit"
 - [ ] Light theme + system-appearance follow
 - [ ] Ship as a signed `.app` bundle
+- [ ] Disk usage statistic (as in load)

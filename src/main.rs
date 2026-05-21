@@ -1,13 +1,28 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::c_void;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
-    actions, div, prelude::*, px, rgb, size, uniform_list, Application, Context, KeyBinding, Menu,
-    MenuItem, MouseButton, SharedString, Window, WindowBounds, WindowOptions,
+    actions, div, img, prelude::*, px, rgb, size, uniform_list, Application, Context, FontWeight,
+    Image as GpuiImage, ImageFormat, KeyBinding, Menu, MenuItem, MouseButton, SharedString,
+    Window, WindowBounds, WindowOptions,
 };
+use sysinfo::Disks;
+
+mod palette {
+    pub const BG: u32 = 0x232323;
+    pub const BG_ALT: u32 = 0x282828;
+    pub const HEADER_BG: u32 = 0x2c2c2c;
+    pub const APP_ROW_BG: u32 = 0x2a2a2a;
+    pub const HOVER_BG: u32 = 0x333333;
+    pub const BORDER: u32 = 0x3a3a3a;
+    pub const TEXT_PRIMARY: u32 = 0xe8e8e8;
+    pub const TEXT_SECONDARY: u32 = 0xa0a0a0;
+    pub const TEXT_MUTED: u32 = 0x8a8a8a;
+    pub const TEXT_APP_NAME: u32 = 0xf5f5f5;
+}
 
 actions!(
     activity_monitor,
@@ -78,12 +93,86 @@ fn phys_footprint(pid: u32) -> Option<u64> {
     }
 }
 
-fn app_for_exe(exe: &Path) -> Option<String> {
+fn app_path_for_exe(exe: &Path) -> Option<(String, PathBuf)> {
     let s = exe.to_str()?;
     let idx = s.find(".app/")?;
     let prefix = &s[..idx];
     let name_start = prefix.rfind('/').map(|p| p + 1).unwrap_or(0);
-    Some(s[name_start..idx].to_string())
+    let name = s[name_start..idx].to_string();
+    let bundle = PathBuf::from(&s[..idx + 4]);
+    Some((name, bundle))
+}
+
+fn load_app_icon(bundle: &Path) -> Option<Arc<GpuiImage>> {
+    let info_path = bundle.join("Contents/Info.plist");
+    let plist: plist::Value = plist::from_file(&info_path).ok()?;
+    let dict = plist.as_dictionary()?;
+    let icon_file = dict.get("CFBundleIconFile")?.as_string()?;
+    let resources = bundle.join("Contents/Resources");
+    let with_ext = if icon_file.ends_with(".icns") {
+        resources.join(icon_file)
+    } else {
+        resources.join(format!("{}.icns", icon_file))
+    };
+    if !with_ext.exists() {
+        return None;
+    }
+    let bytes = std::fs::read(&with_ext).ok()?;
+
+    // Electron-based apps (GitHub Desktop, VS Code forks, etc.) ship a raw PNG
+    // file with a `.icns` extension. NSImage tolerates this; the `icns` crate
+    // rejects it on magic-byte mismatch. Treat PNG-disguised-as-icns as PNG.
+    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Some(Arc::new(GpuiImage::from_bytes(ImageFormat::Png, bytes)));
+    }
+
+    let family = icns::IconFamily::read(std::io::Cursor::new(&bytes)).ok()?;
+    let icon_type = family
+        .available_icons()
+        .into_iter()
+        .max_by_key(|t| t.pixel_width() * t.pixel_height())?;
+    let image = family.get_icon_with_type(icon_type).ok()?;
+    let mut png = Vec::new();
+    image.write_png(&mut png).ok()?;
+    Some(Arc::new(GpuiImage::from_bytes(ImageFormat::Png, png)))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SortColumn {
+    Pid,
+    Name,
+    Cpu,
+    Memory,
+}
+
+impl SortColumn {
+    fn default_dir(self) -> SortDir {
+        match self {
+            Self::Pid | Self::Name => SortDir::Asc,
+            Self::Cpu | Self::Memory => SortDir::Desc,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SortDir {
+    Asc,
+    Desc,
+}
+
+#[derive(Clone, Copy)]
+struct SortState {
+    column: SortColumn,
+    dir: SortDir,
+}
+
+impl Default for SortState {
+    fn default() -> Self {
+        Self {
+            column: SortColumn::Memory,
+            dir: SortDir::Desc,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -91,68 +180,158 @@ struct ProcessInfo {
     pid: u32,
     name: SharedString,
     memory_bytes: u64,
+    cpu: f32,
 }
 
 struct AppGroup {
     key: SharedString,
+    row_id: SharedString,
     display_name: SharedString,
     is_app_bundle: bool,
+    bundle_path: Option<PathBuf>,
     total_memory: u64,
+    total_cpu: f32,
     processes: Vec<ProcessInfo>,
+}
+
+#[derive(Default, Clone, Copy)]
+struct SystemStats {
+    total_memory: u64,
+    used_memory: u64,
+    global_cpu: f32,
+    total_disk: u64,
+    free_disk: u64,
 }
 
 struct ProcessMonitor {
     system: System,
+    disks: Disks,
     groups: Arc<Vec<AppGroup>>,
     expanded: HashSet<SharedString>,
+    sort: SortState,
+    icons: HashMap<SharedString, Option<Arc<GpuiImage>>>,
+    stats: SystemStats,
 }
 
-fn build_groups(sys: &System) -> Vec<AppGroup> {
-    let mut by_app: HashMap<String, (bool, Vec<ProcessInfo>)> = HashMap::new();
+fn sort_processes(procs: &mut [ProcessInfo], sort: SortState) {
+    use std::cmp::Ordering;
+    procs.sort_by(|a, b| {
+        let ord = match sort.column {
+            SortColumn::Pid => a.pid.cmp(&b.pid),
+            SortColumn::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            SortColumn::Cpu => a.cpu.partial_cmp(&b.cpu).unwrap_or(Ordering::Equal),
+            SortColumn::Memory => a.memory_bytes.cmp(&b.memory_bytes),
+        };
+        if sort.dir == SortDir::Desc { ord.reverse() } else { ord }
+    });
+}
+
+fn sort_groups(groups: &mut [AppGroup], sort: SortState) {
+    use std::cmp::Ordering;
+    groups.sort_by(|a, b| {
+        let ord = match sort.column {
+            SortColumn::Pid => {
+                let a_min = a.processes.iter().map(|p| p.pid).min().unwrap_or(0);
+                let b_min = b.processes.iter().map(|p| p.pid).min().unwrap_or(0);
+                a_min.cmp(&b_min)
+            }
+            SortColumn::Name => a
+                .display_name
+                .to_lowercase()
+                .cmp(&b.display_name.to_lowercase()),
+            SortColumn::Cpu => a
+                .total_cpu
+                .partial_cmp(&b.total_cpu)
+                .unwrap_or(Ordering::Equal),
+            SortColumn::Memory => a.total_memory.cmp(&b.total_memory),
+        };
+        if sort.dir == SortDir::Desc { ord.reverse() } else { ord }
+    });
+}
+
+fn build_groups(sys: &System, sort: SortState) -> Vec<AppGroup> {
+    let mut by_app: HashMap<String, (bool, Option<PathBuf>, Vec<ProcessInfo>)> = HashMap::new();
 
     for (pid, p) in sys.processes() {
         let pid_u32 = pid.as_u32();
         let memory = phys_footprint(pid_u32).unwrap_or_else(|| p.memory());
+        let cpu = p.cpu_usage();
         let proc_name = p.name().to_string_lossy().into_owned();
         let pi = ProcessInfo {
             pid: pid_u32,
             name: SharedString::from(proc_name.clone()),
             memory_bytes: memory,
+            cpu,
         };
-        let (key, is_app) = match p.exe().and_then(app_for_exe) {
-            Some(app) => (app, true),
-            None => (proc_name, false),
+        let (key, is_app, bundle) = match p.exe().and_then(app_path_for_exe) {
+            Some((app, path)) => (app, true, Some(path)),
+            None => (proc_name, false, None),
         };
-        let entry = by_app.entry(key).or_insert((is_app, Vec::new()));
+        let entry = by_app.entry(key).or_insert((is_app, None, Vec::new()));
         entry.0 = entry.0 || is_app;
-        entry.1.push(pi);
+        if entry.1.is_none() {
+            entry.1 = bundle;
+        }
+        entry.2.push(pi);
     }
 
     let mut groups: Vec<AppGroup> = by_app
         .into_iter()
-        .map(|(name, (is_app, mut processes))| {
-            processes.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes));
-            let total: u64 = processes.iter().map(|p| p.memory_bytes).sum();
+        .map(|(name, (is_app, bundle_path, mut processes))| {
+            sort_processes(&mut processes, sort);
+            let total_memory: u64 = processes.iter().map(|p| p.memory_bytes).sum();
+            let total_cpu: f32 = processes.iter().map(|p| p.cpu).sum();
             let shared = SharedString::from(name);
+            let row_id = SharedString::from(format!("group-{}", shared));
             AppGroup {
                 key: shared.clone(),
+                row_id,
                 display_name: shared,
                 is_app_bundle: is_app,
-                total_memory: total,
+                bundle_path,
+                total_memory,
+                total_cpu,
                 processes,
             }
         })
         .collect();
 
-    groups.sort_by(|a, b| b.total_memory.cmp(&a.total_memory));
+    sort_groups(&mut groups, sort);
     groups
+}
+
+fn read_stats(sys: &System, disks: &Disks) -> SystemStats {
+    let (total_disk, free_disk) = disks
+        .list()
+        .iter()
+        .find(|d| d.mount_point() == Path::new("/"))
+        .map(|d| (d.total_space(), d.available_space()))
+        .unwrap_or((0, 0));
+    SystemStats {
+        total_memory: sys.total_memory(),
+        used_memory: sys.used_memory(),
+        global_cpu: sys.global_cpu_usage(),
+        total_disk,
+        free_disk,
+    }
 }
 
 impl ProcessMonitor {
     fn new(cx: &mut Context<Self>) -> Self {
         let mut system = System::new_all();
         system.refresh_processes(ProcessesToUpdate::All, true);
-        let groups = Arc::new(build_groups(&system));
+        let disks = Disks::new_with_refreshed_list();
+        let sort = SortState::default();
+        let groups = build_groups(&system, sort);
+        let stats = read_stats(&system, &disks);
+        let mut icons = HashMap::new();
+        for g in &groups {
+            if !icons.contains_key(&g.key) {
+                let icon = g.bundle_path.as_deref().and_then(load_app_icon);
+                icons.insert(g.key.clone(), icon);
+            }
+        }
+        let groups = Arc::new(groups);
 
         cx.spawn(async move |this, cx| loop {
             cx.background_executor()
@@ -161,7 +340,16 @@ impl ProcessMonitor {
             let r = this.update(cx, |this, cx| {
                 this.system
                     .refresh_processes(ProcessesToUpdate::All, true);
-                this.groups = Arc::new(build_groups(&this.system));
+                this.disks.refresh(true);
+                let new_groups = build_groups(&this.system, this.sort);
+                for g in &new_groups {
+                    if !this.icons.contains_key(&g.key) {
+                        let icon = g.bundle_path.as_deref().and_then(load_app_icon);
+                        this.icons.insert(g.key.clone(), icon);
+                    }
+                }
+                this.stats = read_stats(&this.system, &this.disks);
+                this.groups = Arc::new(new_groups);
                 cx.notify();
             });
             if r.is_err() {
@@ -172,9 +360,30 @@ impl ProcessMonitor {
 
         Self {
             system,
+            disks,
             groups,
             expanded: HashSet::new(),
+            sort,
+            icons,
+            stats,
         }
+    }
+
+    fn click_column(&mut self, col: SortColumn, cx: &mut Context<Self>) {
+        if self.sort.column == col {
+            self.sort.dir = if self.sort.dir == SortDir::Asc {
+                SortDir::Desc
+            } else {
+                SortDir::Asc
+            };
+        } else {
+            self.sort = SortState {
+                column: col,
+                dir: col.default_dir(),
+            };
+        }
+        self.groups = Arc::new(build_groups(&self.system, self.sort));
+        cx.notify();
     }
 }
 
@@ -187,30 +396,52 @@ fn format_memory(bytes: u64) -> String {
     }
 }
 
+fn format_cpu(pct: f32) -> String {
+    format!("{:.1}", pct)
+}
+
+fn format_gb(bytes: u64) -> String {
+    format!("{:.1} GB", bytes as f64 / 1024.0 / 1024.0 / 1024.0)
+}
+
 enum Row {
     AppHeader {
         key: SharedString,
+        row_id: SharedString,
         display: SharedString,
         total: u64,
-        count: usize,
+        total_cpu: f32,
         expanded: bool,
+        icon: Option<Arc<GpuiImage>>,
     },
     Process {
         pid: u32,
         name: SharedString,
         memory: u64,
+        cpu: f32,
     },
     Standalone {
         pid: u32,
         name: SharedString,
         memory: u64,
+        cpu: f32,
+        icon: Option<Arc<GpuiImage>>,
     },
 }
 
-fn build_rows(groups: &[AppGroup], expanded: &HashSet<SharedString>) -> Vec<Row> {
+fn build_rows(
+    groups: &[AppGroup],
+    expanded: &HashSet<SharedString>,
+    icons: &HashMap<SharedString, Option<Arc<GpuiImage>>>,
+) -> Vec<Row> {
     let mut out = Vec::new();
     for g in groups {
-        if g.processes.len() == 1 {
+        let icon = icons.get(&g.key).cloned().flatten();
+        let single_matches = g.processes.len() == 1
+            && g.is_app_bundle
+            && g.processes[0].name == g.display_name;
+        let is_flat = !g.is_app_bundle || single_matches;
+        if is_flat {
             let p = &g.processes[0];
             out.push(Row::Standalone {
                 pid: p.pid,
@@ -220,15 +451,19 @@ fn build_rows(groups: &[AppGroup], expanded: &HashSet<SharedString>) -> Vec<Row>
                     p.name.clone()
                 },
                 memory: g.total_memory,
+                cpu: g.total_cpu,
+                icon: if g.is_app_bundle { icon } else { None },
             });
         } else {
             let is_expanded = expanded.contains(&g.key);
             out.push(Row::AppHeader {
                 key: g.key.clone(),
+                row_id: g.row_id.clone(),
                 display: g.display_name.clone(),
                 total: g.total_memory,
-                count: g.processes.len(),
+                total_cpu: g.total_cpu,
                 expanded: is_expanded,
+                icon,
             });
             if is_expanded {
                 for p in &g.processes {
@@ -236,6 +471,7 @@ fn build_rows(groups: &[AppGroup], expanded: &HashSet<SharedString>) -> Vec<Row>
                         pid: p.pid,
                         name: p.name.clone(),
                         memory: p.memory_bytes,
+                        cpu: p.cpu,
                     });
                 }
             }
@@ -246,31 +482,80 @@ fn build_rows(groups: &[AppGroup], expanded: &HashSet<SharedString>) -> Vec<Row>
 
 impl Render for ProcessMonitor {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let rows = Arc::new(build_rows(&self.groups, &self.expanded));
+        let rows = Arc::new(build_rows(&self.groups, &self.expanded, &self.icons));
         let row_count = rows.len();
         let entity = cx.entity();
+        let stats = self.stats;
+
+        let sort = self.sort;
+        let header_entity = entity.clone();
+        let sort_marker = |col: SortColumn| -> &'static str {
+            if sort.column == col {
+                if sort.dir == SortDir::Desc { " ▾" } else { " ▴" }
+            } else {
+                ""
+            }
+        };
+        let make_header_cell = {
+            let header_entity = header_entity.clone();
+            move |id: &'static str,
+                  label: &'static str,
+                  col: SortColumn,
+                  width: Option<gpui::Pixels>,
+                  right: bool| {
+                let active = sort.column == col;
+                let marker = sort_marker(col);
+                let entity_for_click = header_entity.clone();
+                let mut cell = div()
+                    .id(id)
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .text_color(if active {
+                        rgb(palette::TEXT_PRIMARY)
+                    } else {
+                        rgb(palette::TEXT_MUTED)
+                    })
+                    .hover(|s| s.text_color(rgb(palette::TEXT_PRIMARY)))
+                    .on_mouse_down(MouseButton::Left, move |_, _, app| {
+                        entity_for_click.update(app, |this, cx| this.click_column(col, cx));
+                    })
+                    .child(format!("{}{}", label, marker));
+                cell = match width {
+                    Some(w) => cell.w(w),
+                    None => cell.flex_1(),
+                };
+                if right {
+                    cell = cell.justify_end();
+                }
+                cell
+            }
+        };
 
         let header = div()
             .flex()
             .flex_row()
             .w_full()
-            .h(px(28.))
-            .bg(rgb(0x2a2a2a))
-            .text_color(rgb(0xcccccc))
+            .h(px(30.))
+            .bg(rgb(palette::HEADER_BG))
+            .text_xs()
+            .font_weight(FontWeight::SEMIBOLD)
             .border_b_1()
-            .border_color(rgb(0x3a3a3a))
+            .border_color(rgb(palette::BORDER))
             .px_3()
             .items_center()
-            .child(div().w(px(80.)).child("PID"))
-            .child(div().flex_1().child("Name"))
-            .child(div().w(px(120.)).flex().justify_end().child("Memory"));
+            .child(make_header_cell("h-pid", "PID", SortColumn::Pid, Some(px(80.)), false))
+            .child(make_header_cell("h-name", "Process Name", SortColumn::Name, None, false))
+            .child(make_header_cell("h-cpu", "% CPU", SortColumn::Cpu, Some(px(70.)), true))
+            .child(make_header_cell("h-mem", "Memory", SortColumn::Memory, Some(px(120.)), true));
 
         div()
             .flex()
             .flex_col()
             .size_full()
-            .bg(rgb(0x1e1e1e))
-            .text_color(rgb(0xeeeeee))
+            .bg(rgb(palette::BG))
+            .text_color(rgb(palette::TEXT_PRIMARY))
             .text_sm()
             .child(header)
             .child(
@@ -282,26 +567,26 @@ impl Render for ProcessMonitor {
                             .map(|i| match &rows[i] {
                                 Row::AppHeader {
                                     key,
+                                    row_id,
                                     display,
                                     total,
-                                    count,
+                                    total_cpu,
                                     expanded,
+                                    icon,
                                 } => {
-                                    let chevron = if *expanded { "v" } else { ">" };
+                                    let chevron = if *expanded { "▾" } else { "▸" };
                                     let key_clone = key.clone();
                                     let entity_clone = entity.clone();
-                                    let id_str: SharedString =
-                                        format!("group-{}", key).into();
                                     div()
-                                        .id(id_str)
+                                        .id(row_id.clone())
                                         .flex()
                                         .flex_row()
                                         .w_full()
-                                        .h(px(24.))
+                                        .h(px(26.))
                                         .px_3()
                                         .items_center()
-                                        .bg(rgb(0x252525))
-                                        .hover(|s| s.bg(rgb(0x2f2f2f)))
+                                        .bg(rgb(palette::APP_ROW_BG))
+                                        .hover(|s| s.bg(rgb(palette::HOVER_BG)))
                                         .cursor_pointer()
                                         .on_mouse_down(
                                             MouseButton::Left,
@@ -318,67 +603,179 @@ impl Render for ProcessMonitor {
                                         .child(
                                             div()
                                                 .w(px(80.))
-                                                .child(format!("{} {}", chevron, count)),
+                                                .text_color(rgb(palette::TEXT_SECONDARY))
+                                                .child(chevron),
                                         )
                                         .child(
                                             div()
                                                 .flex_1()
-                                                .text_color(rgb(0xffffff))
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_2()
+                                                .text_color(rgb(palette::TEXT_APP_NAME))
+                                                .child({
+                                                    let slot = div()
+                                                        .w(px(16.))
+                                                        .h(px(16.))
+                                                        .flex_none();
+                                                    match icon {
+                                                        Some(icon) => slot.child(
+                                                            img(icon.clone())
+                                                                .w(px(16.))
+                                                                .h(px(16.)),
+                                                        ),
+                                                        None => slot,
+                                                    }
+                                                })
                                                 .child(display.clone()),
+                                        )
+                                        .child(
+                                            div()
+                                                .w(px(70.))
+                                                .flex()
+                                                .justify_end()
+                                                .text_color(rgb(palette::TEXT_APP_NAME))
+                                                .child(format_cpu(*total_cpu)),
                                         )
                                         .child(
                                             div()
                                                 .w(px(120.))
                                                 .flex()
                                                 .justify_end()
-                                                .text_color(rgb(0xffffff))
+                                                .text_color(rgb(palette::TEXT_APP_NAME))
                                                 .child(format_memory(*total)),
                                         )
                                         .into_any_element()
                                 }
-                                Row::Process { pid, name, memory } => div()
-                                    .flex()
-                                    .flex_row()
-                                    .w_full()
-                                    .h(px(22.))
-                                    .pl(px(36.))
-                                    .pr_3()
-                                    .items_center()
-                                    .text_color(rgb(0xbbbbbb))
-                                    .hover(|s| s.bg(rgb(0x2a2a2a)))
-                                    .child(div().w(px(60.)).child(format!("{}", pid)))
-                                    .child(div().flex_1().child(name.clone()))
-                                    .child(
-                                        div()
-                                            .w(px(120.))
-                                            .flex()
-                                            .justify_end()
-                                            .child(format_memory(*memory)),
-                                    )
-                                    .into_any_element(),
-                                Row::Standalone { pid, name, memory } => div()
-                                    .flex()
-                                    .flex_row()
-                                    .w_full()
-                                    .h(px(22.))
-                                    .px_3()
-                                    .items_center()
-                                    .hover(|s| s.bg(rgb(0x2a2a2a)))
-                                    .child(div().w(px(80.)).child(format!("{}", pid)))
-                                    .child(div().flex_1().child(name.clone()))
-                                    .child(
-                                        div()
-                                            .w(px(120.))
-                                            .flex()
-                                            .justify_end()
-                                            .child(format_memory(*memory)),
-                                    )
-                                    .into_any_element(),
+                                Row::Process { pid, name, memory, cpu } => {
+                                    let bg = if i % 2 == 1 { palette::BG_ALT } else { palette::BG };
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .w_full()
+                                        .h(px(24.))
+                                        .px_3()
+                                        .items_center()
+                                        .bg(rgb(bg))
+                                        .text_color(rgb(palette::TEXT_SECONDARY))
+                                        .hover(|s| s.bg(rgb(palette::HOVER_BG)))
+                                        .child(
+                                            div()
+                                                .w(px(80.))
+                                                .pl(px(24.))
+                                                .child(format!("{}", pid)),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_2()
+                                                .child(
+                                                    div().w(px(16.)).h(px(16.)).flex_none(),
+                                                )
+                                                .child(name.clone()),
+                                        )
+                                        .child(
+                                            div()
+                                                .w(px(70.))
+                                                .flex()
+                                                .justify_end()
+                                                .child(format_cpu(*cpu)),
+                                        )
+                                        .child(
+                                            div()
+                                                .w(px(120.))
+                                                .flex()
+                                                .justify_end()
+                                                .child(format_memory(*memory)),
+                                        )
+                                        .into_any_element()
+                                }
+                                Row::Standalone { pid, name, memory, cpu, icon } => {
+                                    let bg = if i % 2 == 1 { palette::BG_ALT } else { palette::BG };
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .w_full()
+                                        .h(px(24.))
+                                        .px_3()
+                                        .items_center()
+                                        .bg(rgb(bg))
+                                        .hover(|s| s.bg(rgb(palette::HOVER_BG)))
+                                        .child(div().w(px(80.)).child(format!("{}", pid)))
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .flex()
+                                                .flex_row()
+                                                .items_center()
+                                                .gap_2()
+                                                .child({
+                                                    let slot = div()
+                                                        .w(px(16.))
+                                                        .h(px(16.))
+                                                        .flex_none();
+                                                    match icon {
+                                                        Some(icon) => slot.child(
+                                                            img(icon.clone())
+                                                                .w(px(16.))
+                                                                .h(px(16.)),
+                                                        ),
+                                                        None => slot,
+                                                    }
+                                                })
+                                                .child(name.clone()),
+                                        )
+                                        .child(
+                                            div()
+                                                .w(px(70.))
+                                                .flex()
+                                                .justify_end()
+                                                .child(format_cpu(*cpu)),
+                                        )
+                                        .child(
+                                            div()
+                                                .w(px(120.))
+                                                .flex()
+                                                .justify_end()
+                                                .child(format_memory(*memory)),
+                                        )
+                                        .into_any_element()
+                                }
                             })
                             .collect()
                     })
                     .size_full(),
                 ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .w_full()
+                    .h(px(30.))
+                    .px_3()
+                    .items_center()
+                    .gap_6()
+                    .bg(rgb(palette::HEADER_BG))
+                    .border_t_1()
+                    .border_color(rgb(palette::BORDER))
+                    .text_xs()
+                    .text_color(rgb(palette::TEXT_MUTED))
+                    .child(div().child(format!(
+                        "Memory: {} / {}",
+                        format_gb(stats.used_memory),
+                        format_gb(stats.total_memory)
+                    )))
+                    .child(div().child(format!("CPU: {:.1}%", stats.global_cpu)))
+                    .child(div().child(format!(
+                        "Disk free: {} / {}",
+                        format_gb(stats.free_disk),
+                        format_gb(stats.total_disk)
+                    ))),
             )
     }
 }
