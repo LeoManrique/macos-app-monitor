@@ -6,6 +6,7 @@ struct StatusFooterView: View {
     var body: some View {
         HStack(spacing: 24) {
             Text("Memory: \(Formatters.gigabytes(bytes: stats.usedMemory)) / \(Formatters.gigabytes(bytes: stats.totalMemory))")
+            Text("Swap: \(Formatters.memory(bytes: stats.usedSwap))")
             Text(String(format: "CPU: %.1f%%", stats.globalCpu))
             Text("Disk free: \(Formatters.gigabytes(bytes: stats.freeDisk)) / \(Formatters.gigabytes(bytes: stats.totalDisk))")
             Spacer()

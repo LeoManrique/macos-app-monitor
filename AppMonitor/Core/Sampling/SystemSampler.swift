@@ -11,6 +11,7 @@ final class SystemSampler: @unchecked Sendable {
         SystemStatsSnapshot(
             totalMemory: totalPhysicalMemory(),
             usedMemory: usedPhysicalMemory(),
+            usedSwap: usedSwap(),
             globalCpu: globalCpuUsage(),
             totalDisk: totalDisk(),
             freeDisk: freeDisk()
@@ -36,17 +37,33 @@ final class SystemSampler: @unchecked Sendable {
             }
         }
         guard result == KERN_SUCCESS else { return 0 }
-        // "Used" = active + wired + compressed. Inactive is freeable cache;
-        // matches what Activity Monitor calls "Memory Used" in its footer.
+        // Matches Activity Monitor's prominent "Memory Used" total exactly:
+        //   Memory Used = Physical Memory - Free - Cached Files
+        // Computing it additively (internal + speculative + wired + compressor)
+        // undercounts by ~0.5 GB on typical systems because the kernel holds memory
+        // that isn't tagged into any of those vm_statistics64 buckets (IOKit slabs,
+        // misc kernel allocations). The subtractive form sidesteps that — anything
+        // the kernel doesn't tag as freeable is, by definition, in use.
         // Swift 6 strict concurrency rejects `vm_kernel_page_size` (global var);
         // `host_page_size` is the concurrency-safe equivalent.
         var pageSizeRaw: vm_size_t = 0
         host_page_size(mach_host_self(), &pageSizeRaw)
         let pageSize = UInt64(pageSizeRaw)
-        let active = UInt64(stats.active_count)
-        let wired = UInt64(stats.wire_count)
-        let compressed = UInt64(stats.compressor_page_count)
-        return (active + wired + compressed) * pageSize
+        let free = UInt64(stats.free_count) * pageSize
+        let cached = UInt64(stats.external_page_count) * pageSize
+        let total = totalPhysicalMemory()
+        let freeable = free &+ cached
+        return total > freeable ? total &- freeable : 0
+    }
+
+    // MARK: - Swap
+
+    private func usedSwap() -> UInt64 {
+        var usage = xsw_usage()
+        var len = MemoryLayout<xsw_usage>.size
+        let result = sysctlbyname("vm.swapusage", &usage, &len, nil, 0)
+        guard result == 0 else { return 0 }
+        return usage.xsu_used
     }
 
     // MARK: - CPU

@@ -11,12 +11,13 @@ struct RawProcess: Sendable, Hashable {
 struct SystemStatsSnapshot: Sendable {
     let totalMemory: UInt64
     let usedMemory: UInt64
+    let usedSwap: UInt64
     let globalCpu: Double
     let totalDisk: UInt64
     let freeDisk: UInt64
 
     static let empty = SystemStatsSnapshot(
-        totalMemory: 0, usedMemory: 0, globalCpu: 0, totalDisk: 0, freeDisk: 0
+        totalMemory: 0, usedMemory: 0, usedSwap: 0, globalCpu: 0, totalDisk: 0, freeDisk: 0
     )
 }
 
