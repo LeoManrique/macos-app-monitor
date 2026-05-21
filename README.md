@@ -1,18 +1,14 @@
 # macos-app-monitor
 
-A minimal GPUI alternative for macOS Activity Monitor's memory view, with processes grouped by `app` to visualize how much memory would be reclaimed by quitting an app.
+Simple alternative for macOS Activity Monitor's, grouping processes by `.app` to visualize how much memory would be reclaimed by quitting a specific app. Built in GPUI.
 
-## Requirements
-
-- macOS 26 (Apple Silicon)
-- Rust (stable, 2024 edition)
-- Xcode + Metal Toolchain
-
-## Run
+## Install
 
 ```
-cargo run --release
+curl -fsSL https://raw.githubusercontent.com/LeoManrique/macos-app-monitor/master/scripts/install.sh | bash
 ```
+
+Installs the latest release to `/Applications/AppMonitor.app`. The bundle is ad-hoc signed (no Apple Developer Program membership behind it), so the install script strips the Gatekeeper quarantine attribute on your behalf.
 
 ## Docs
 

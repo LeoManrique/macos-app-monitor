@@ -15,7 +15,6 @@ mod palette {
     pub const BG: u32 = 0x232323;
     pub const BG_ALT: u32 = 0x282828;
     pub const HEADER_BG: u32 = 0x2c2c2c;
-    pub const APP_ROW_BG: u32 = 0x2a2a2a;
     pub const HOVER_BG: u32 = 0x333333;
     pub const BORDER: u32 = 0x3a3a3a;
     pub const TEXT_PRIMARY: u32 = 0xe8e8e8;
@@ -127,10 +126,23 @@ fn load_app_icon(bundle: &Path) -> Option<Arc<GpuiImage>> {
     }
 
     let family = icns::IconFamily::read(std::io::Cursor::new(&bytes)).ok()?;
-    let icon_type = family
-        .available_icons()
-        .into_iter()
-        .max_by_key(|t| t.pixel_width() * t.pixel_height())?;
+    // We render the icon at 16 logical pixels, so 32 actual pixels on a 2×
+    // retina display is plenty. Picking the *smallest* icon that meets that
+    // threshold keeps each cached texture at ~4 KB instead of ~4 MB — modern
+    // .icns files ship a 1024×1024 variant which would otherwise dominate
+    // the app's resident memory.
+    let available = family.available_icons();
+    let icon_type = available
+        .iter()
+        .copied()
+        .filter(|t| t.pixel_width() >= 32)
+        .min_by_key(|t| t.pixel_width() * t.pixel_height())
+        .or_else(|| {
+            available
+                .iter()
+                .copied()
+                .max_by_key(|t| t.pixel_width() * t.pixel_height())
+        })?;
     let image = family.get_icon_with_type(icon_type).ok()?;
     let mut png = Vec::new();
     image.write_png(&mut png).ok()?;
@@ -340,6 +352,11 @@ impl ProcessMonitor {
             let r = this.update(cx, |this, cx| {
                 this.system
                     .refresh_processes(ProcessesToUpdate::All, true);
+                // refresh_processes leaves the system-wide memory/CPU caches
+                // stale, so the footer would freeze at whatever System::new_all
+                // captured at startup. Refresh them on every tick too.
+                this.system.refresh_memory();
+                this.system.refresh_cpu_usage();
                 this.disks.refresh(true);
                 let new_groups = build_groups(&this.system, this.sort);
                 for g in &new_groups {
@@ -413,12 +430,14 @@ enum Row {
         total_cpu: f32,
         expanded: bool,
         icon: Option<Arc<GpuiImage>>,
+        top_idx: usize,
     },
     Process {
         pid: u32,
         name: SharedString,
         memory: u64,
         cpu: f32,
+        top_idx: usize,
     },
     Standalone {
         pid: u32,
@@ -426,6 +445,7 @@ enum Row {
         memory: u64,
         cpu: f32,
         icon: Option<Arc<GpuiImage>>,
+        top_idx: usize,
     },
 }
 
@@ -435,7 +455,7 @@ fn build_rows(
     icons: &HashMap<SharedString, Option<Arc<GpuiImage>>>,
 ) -> Vec<Row> {
     let mut out = Vec::new();
-    for g in groups {
+    for (top_idx, g) in groups.iter().enumerate() {
         let icon = icons.get(&g.key).cloned().flatten();
         let single_matches = g.processes.len() == 1
             && g.is_app_bundle
@@ -453,6 +473,7 @@ fn build_rows(
                 memory: g.total_memory,
                 cpu: g.total_cpu,
                 icon: if g.is_app_bundle { icon } else { None },
+                top_idx,
             });
         } else {
             let is_expanded = expanded.contains(&g.key);
@@ -464,6 +485,7 @@ fn build_rows(
                 total_cpu: g.total_cpu,
                 expanded: is_expanded,
                 icon,
+                top_idx,
             });
             if is_expanded {
                 for p in &g.processes {
@@ -472,6 +494,7 @@ fn build_rows(
                         name: p.name.clone(),
                         memory: p.memory_bytes,
                         cpu: p.cpu,
+                        top_idx,
                     });
                 }
             }
@@ -573,10 +596,12 @@ impl Render for ProcessMonitor {
                                     total_cpu,
                                     expanded,
                                     icon,
+                                    top_idx,
                                 } => {
                                     let chevron = if *expanded { "▾" } else { "▸" };
                                     let key_clone = key.clone();
                                     let entity_clone = entity.clone();
+                                    let bg = if top_idx % 2 == 1 { palette::BG_ALT } else { palette::BG };
                                     div()
                                         .id(row_id.clone())
                                         .flex()
@@ -585,7 +610,7 @@ impl Render for ProcessMonitor {
                                         .h(px(26.))
                                         .px_3()
                                         .items_center()
-                                        .bg(rgb(palette::APP_ROW_BG))
+                                        .bg(rgb(bg))
                                         .hover(|s| s.bg(rgb(palette::HOVER_BG)))
                                         .cursor_pointer()
                                         .on_mouse_down(
@@ -648,8 +673,8 @@ impl Render for ProcessMonitor {
                                         )
                                         .into_any_element()
                                 }
-                                Row::Process { pid, name, memory, cpu } => {
-                                    let bg = if i % 2 == 1 { palette::BG_ALT } else { palette::BG };
+                                Row::Process { pid, name, memory, cpu, top_idx } => {
+                                    let bg = if top_idx % 2 == 1 { palette::BG_ALT } else { palette::BG };
                                     div()
                                         .flex()
                                         .flex_row()
@@ -658,8 +683,8 @@ impl Render for ProcessMonitor {
                                         .px_3()
                                         .items_center()
                                         .bg(rgb(bg))
-                                        .text_color(rgb(palette::TEXT_SECONDARY))
                                         .hover(|s| s.bg(rgb(palette::HOVER_BG)))
+                                        .text_color(rgb(palette::TEXT_SECONDARY))
                                         .child(
                                             div()
                                                 .w(px(80.))
@@ -694,8 +719,8 @@ impl Render for ProcessMonitor {
                                         )
                                         .into_any_element()
                                 }
-                                Row::Standalone { pid, name, memory, cpu, icon } => {
-                                    let bg = if i % 2 == 1 { palette::BG_ALT } else { palette::BG };
+                                Row::Standalone { pid, name, memory, cpu, icon, top_idx } => {
+                                    let bg = if top_idx % 2 == 1 { palette::BG_ALT } else { palette::BG };
                                     div()
                                         .flex()
                                         .flex_row()

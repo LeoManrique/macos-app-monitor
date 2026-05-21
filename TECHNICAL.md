@@ -20,7 +20,7 @@ The bundle path (everything up to and including the `.app`) is captured alongsid
 
 ## Icon loading
 
-For each `.app` group we parse `Contents/Info.plist` (via `plist`), read `CFBundleIconFile`, locate the `.icns` in `Contents/Resources`, decode it with the `icns` crate, and pick the largest available `IconType`. The decoded RGBA is encoded to PNG and wrapped in `Arc<gpui::Image>` for direct rendering with `img()` — no temp files.
+For each `.app` group we parse `Contents/Info.plist` (via `plist`), read `CFBundleIconFile`, locate the `.icns` in `Contents/Resources`, decode it with the `icns` crate, and pick the *smallest* `IconType` whose pixel width is ≥ 32 (covers our 16 pt × 2× retina render). Modern `.icns` files ship a 1024×1024 variant; caching that for every visible app would burn ~4 MB per icon × dozens of apps — picking the 32 px variant keeps each cached texture at ~4 KB. The decoded RGBA is encoded to PNG and wrapped in `Arc<gpui::Image>` for direct rendering with `img()` — no temp files.
 
 Before the `icns` decode we sniff the file's magic bytes. Electron-based apps (GitHub Desktop, several Electron forks) ship a raw PNG with a `.icns` extension — `NSImage` tolerates the mismatch but the `icns` crate rejects it. When we see the PNG magic literal we wrap the bytes as `ImageFormat::Png` directly and skip the icns decoder.
 
@@ -40,6 +40,18 @@ App-header rows are `Stateful<Div>` (via `.id(...)`); their `on_mouse_down` hand
 
 Computed at launch from `cx.primary_display().bounds().size`, scaled to 50% × 70%, passed via `WindowBounds::centered(size, cx)`.
 
-## Build prerequisite
+## Building
+
+Requirements: macOS 26 (Apple Silicon), Rust stable (2024 edition), Xcode + Metal Toolchain.
+
+```
+cargo run --release               # run in place
+scripts/bundle.sh                 # build AppMonitor.app at target/release/bundle/
+scripts/deploy_releases.sh x.y.z  # tag, build, bundle, and publish a GitHub release
+```
 
 Building gpui's Metal shaders on Xcode 26 requires the Metal Toolchain component (`xcodebuild -downloadComponent MetalToolchain`, ~688 MB, one-time, persists across `cargo clean`).
+
+## Packaging
+
+`scripts/bundle.sh` assembles `AppMonitor.app` from three inputs: the release binary (`target/release/activity-monitor` → `Contents/MacOS/`), `assets/Info.plist` with the `{{VERSION}}` placeholder substituted from `Cargo.toml`, and `assets/AppIcon.icns` (copied to `Contents/Resources/AppIcon.icns` to match `CFBundleIconFile`).
