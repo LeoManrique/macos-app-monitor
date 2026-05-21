@@ -35,7 +35,7 @@ Opens centered at 50% × 70% of the primary display. Dark theme. Single view, no
 - **Flat row**: no header chrome. Used when:
   - The process is outside any `.app` (CLI tools, daemons).
   - A single-process `.app` bundle whose process name exactly matches the bundle name (e.g. `LeoSync.app` running just `LeoSync`).
-- Rows for `.app` bundles show the app's icon (16×16) before the name. Bundles whose icon only ships via `Assets.car` have no icon (see TECHNICAL.md). Rows without an icon still reserve the 16 px slot, so all names line up.
+- Rows for `.app` bundles show the app's icon (16×16) before the name. Icons come from `NSWorkspace.shared.icon(forFile:)`, which handles `Info.plist`, `.icns`, `Assets.car`, and Electron-app quirks transparently. Rows without an icon still reserve the 16 px slot, so all names line up.
 
 ## Status bar
 

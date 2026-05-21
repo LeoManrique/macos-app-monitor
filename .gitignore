@@ -1,1 +1,13 @@
+# Xcode + xcodebuild outputs
+/build
 /target
+/dist
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+DerivedData/
+
+# macOS
+.DS_Store

@@ -2,56 +2,100 @@
 
 ## Stack
 
-- **Rust 2024**, single `src/main.rs`.
-- **`gpui-ce`** (crates.io community fork of Zed's GPUI) for the UI. The upstream `zed-industries/zed` gpui silently fails to render text on macOS 26 due to a Metal SDK mismatch; `gpui-ce` ships shaders built against the current SDK and works standalone.
-- **`sysinfo`** for enumerating processes and reading executable paths.
+- **Swift 6** (strict concurrency), targeting **macOS 26 SDK**.
+- **SwiftUI** for the UI: hierarchical `Table(_:children:)`, `KeyPathComparator` sort, native `CommandMenu`.
+- **`@Observable` model** (`ProcessMonitor`) running on `@MainActor`, sampled off-main via `Task.detached`.
+- No third-party Swift dependencies. All system access goes through `Darwin` / `AppKit`.
+
+## Project layout
+
+```
+AppMonitor/
+  App/          @main scene + menu bar (AppMonitorApp, AppCommands)
+  Features/
+    ProcessList/   Table view, sort state, group builder, refresh model
+    Footer/        Status bar with system totals
+  Core/
+    Sampling/      proc_listpids, proc_pid_rusage, host_statistics64
+    AppBundles/    leftmost-`.app/` resolver
+    Icons/         NSWorkspace.shared.icon(forFile:) cache (actor)
+  UI/             Palette, Formatters
+  Resources/      Info.plist, Assets.xcassets (AppIcon ladder)
+```
+
+The Xcode project is generated from `project.yml` via **xcodegen**: `xcodegen generate` recreates `AppMonitor.xcodeproj` whenever sources or settings change. `scripts/bundle.sh` runs it on every build, so the checked-in `.xcodeproj` is effectively a cache.
 
 ## Memory readings
 
-`sysinfo`'s `process.memory()` returns RSS, which overcounts shared framework pages. To match Activity Monitor, the app calls `proc_pid_rusage(pid, RUSAGE_INFO_V4, &mut buf)` directly via FFI and reads `ri_phys_footprint`. The Rust mirror of `rusage_info_v4` must match the SDK struct byte-for-byte (35 `u64` fields + 16-byte UUID = 296 bytes) — kernel writes the full flavor size and a truncated buffer corrupts the stack.
+Per-process memory comes from `proc_pid_rusage(pid, RUSAGE_INFO_V4, &info).ri_phys_footprint`. The `rusage_info_v4` struct is auto-bridged from `Darwin` — no FFI struct mirror needed.
 
-For processes the user doesn't own, `proc_pid_rusage` returns `EPERM`; the code falls back to `sysinfo`'s RSS.
+For processes the user doesn't own, the call returns EPERM; the code falls back to `proc_pidinfo(PROC_PIDTASKINFO).pti_resident_size`.
+
+## CPU readings
+
+`proc_pid_rusage` returns cumulative user+system time in nanoseconds. `ProcessCPUSampler` keeps a per-pid sample from the previous tick and computes `(Δcpu_ns / 1e9) / Δwall_seconds * 100` to produce the same "single fully-busy core = 100%" semantics Activity Monitor uses.
+
+System-wide CPU is read via `host_statistics(HOST_CPU_LOAD_INFO)` and diffed against the previous reading inside `SystemSampler`.
 
 ## App-bundle detection
 
-Each process's executable path is searched for the **leftmost** `.app/` substring. For nested bundles (e.g. `/Applications/Google Chrome.app/.../Google Chrome Helper.app/...`), the leftmost match is the outermost bundle, which is the user-facing app. Processes whose exe has no `.app/` in the path become their own single-member group keyed by process name.
+`AppBundleResolver.resolve(executablePath:)` finds the **leftmost** `.app/` substring in the executable path. For nested bundles (e.g. `Google Chrome.app/.../Google Chrome Helper.app/...`), the leftmost match is the outermost bundle — the user-facing app. Processes whose exe has no `.app/` in the path become their own single-member group keyed by process name.
 
-The bundle path (everything up to and including the `.app`) is captured alongside the name for icon loading.
+The bundle path (everything up to and including the `.app`) is captured alongside the name and threaded through to the icon loader.
 
 ## Icon loading
 
-For each `.app` group we parse `Contents/Info.plist` (via `plist`), read `CFBundleIconFile`, locate the `.icns` in `Contents/Resources`, decode it with the `icns` crate, and pick the *smallest* `IconType` whose pixel width is ≥ 32 (covers our 16 pt × 2× retina render). Modern `.icns` files ship a 1024×1024 variant; caching that for every visible app would burn ~4 MB per icon × dozens of apps — picking the 32 px variant keeps each cached texture at ~4 KB. The decoded RGBA is encoded to PNG and wrapped in `Arc<gpui::Image>` for direct rendering with `img()` — no temp files.
+`NSWorkspace.shared.icon(forFile: bundlePath)` returns the same icon Finder shows for the bundle. That single call replaces the Rust app's ~50 lines of:
 
-Before the `icns` decode we sniff the file's magic bytes. Electron-based apps (GitHub Desktop, several Electron forks) ship a raw PNG with a `.icns` extension — `NSImage` tolerates the mismatch but the `icns` crate rejects it. When we see the PNG magic literal we wrap the bytes as `ImageFormat::Png` directly and skip the icns decoder.
+- `Info.plist` parse to find `CFBundleIconFile`
+- `.icns` decode via the `icns` crate
+- PNG-magic-byte sniff for Electron apps that ship a PNG with an `.icns` extension
+- "Pick the smallest variant ≥ 32 px" selection
+- `Assets.car` fall-through
 
-Icons are cached on `ProcessMonitor` keyed by group name. Lookups happen once per group: a successful load stays cached; a failed load is recorded as `None` so we don't retry every 2-second tick. Apps whose icon ships only via `Assets.car` (Apple system apps, some third-party apps without a legacy `.icns`) cannot be decoded with `icns` alone and fall through to the `None` branch.
+NSWorkspace handles all of those internally. Icons are cached on an `actor AppIconLoader`, keyed by bundle path; a successful load stays cached, a failed load (invalid bundle) is cached as `nil` so the lookup isn't retried every tick.
 
 ## Refresh loop
 
-`ProcessMonitor::new` spawns a long-lived async task via `cx.spawn(async move |this, cx| ...)`. Each iteration awaits `cx.background_executor().timer(Duration::from_secs(2))`, then runs `this.update(cx, |this, cx| { ... cx.notify() })`. The update closure refreshes `sysinfo`, rebuilds the groups, and asks GPUI to re-render. If `this.update` returns `Err`, the entity has been dropped and the loop exits.
+`ProcessMonitor.start()` spawns a single `Task` that runs `while !Task.isCancelled { refresh(); try? await Task.sleep(for: .seconds(2)) }`. SwiftUI's `.task {}` modifier on the root view starts it; `.onDisappear {}` calls `stop()` to cancel.
+
+Inside `refresh()`:
+
+1. `Task.detached { ProcessSampler.enumerate() }.value` enumerates all pids off-main (the bulk of the work on machines with hundreds of processes).
+2. `SystemSampler.sample()` reads memory / CPU / disk on main.
+3. `ProcessCPUSampler.cpuPercents(...)` diffs against the previous sample.
+4. `AppGroupBuilder.build(...)` runs as a pure function — same input always yields the same `[AppRow]`.
+5. The state write is pushed to the *next* runloop iteration via `DispatchQueue.main.async` so it doesn't fire during an in-flight NSTableView delegate callback.
 
 ## UI structure
 
-`Render::render` flattens current groups + expansion state into a `Vec<Row>` (header / process / standalone variants) and feeds it to `uniform_list` for virtualized scrolling. Expand/collapse state lives on `ProcessMonitor` as a `HashSet<SharedString>` keyed by group name, so refresh ticks that rebuild the group vector preserve which apps the user expanded.
+`ProcessListView` is a single SwiftUI `Table(_:children:)` over `[AppRow]`. `AppRow` is the unified row type — header rows have `children: [AppRow]`, leaf rows have `children: nil`. SwiftUI's `Table` renders disclosure triangles, virtualizes off-screen rows, and drives sort via the `sortOrder:` binding.
 
-App-header rows are `Stateful<Div>` (via `.id(...)`); their `on_mouse_down` handler captures the entity and toggles the key in `expanded`.
+Sort changes flow through `onChange(of: sortOrder)` and are deferred one tick via `Task { @MainActor in ... }` to avoid the reentrant-NSTableView-delegate warning that synchronous mutation produces.
+
+`StatusFooterView` is a sibling `HStack` that reads `monitor.stats` directly.
 
 ## Window
 
-Computed at launch from `cx.primary_display().bounds().size`, scaled to 50% × 70%, passed via `WindowBounds::centered(size, cx)`.
+`Window("App Monitor", id: "main")` with `.defaultSize(...)` computed at scene init from `NSScreen.main?.frame` (50% × 70%). Window positioning is delegated to the system; SwiftUI centers the window automatically on first launch.
+
+## Menu bar
+
+`AppCommands` adds Minimize (⌘M), Zoom, and Enter Full Screen (⌃⌘F) under the system Window menu. Hide (⌘H) and Quit (⌘Q) are provided by SwiftUI's default app menu. `CommandGroup(replacing: .newItem) {}` hides the File ▸ New item we don't need.
 
 ## Building
 
-Requirements: macOS 26 (Apple Silicon), Rust stable (2024 edition), Xcode + Metal Toolchain.
+Requirements: macOS 26 (Apple Silicon), Xcode 26+, xcodegen (`brew install xcodegen`).
 
 ```
-cargo run --release               # run in place
-scripts/bundle.sh                 # build AppMonitor.app at target/release/bundle/
+xcodegen generate                 # regenerate AppMonitor.xcodeproj from project.yml
+xcodebuild -scheme AppMonitor build  # build into ~/Library/Developer/Xcode/DerivedData
+scripts/bundle.sh                 # build + lay out AppMonitor.app at target/release/bundle/
 scripts/deploy_releases.sh x.y.z  # tag, build, bundle, and publish a GitHub release
 ```
 
-Building gpui's Metal shaders on Xcode 26 requires the Metal Toolchain component (`xcodebuild -downloadComponent MetalToolchain`, ~688 MB, one-time, persists across `cargo clean`).
+`project.yml` is the source of truth for build settings, deployment target, and version. `xcodegen` regenerates `AppMonitor.xcodeproj` from it.
 
 ## Packaging
 
-`scripts/bundle.sh` assembles `AppMonitor.app` from three inputs: the release binary (`target/release/activity-monitor` → `Contents/MacOS/`), `assets/Info.plist` with the `{{VERSION}}` placeholder substituted from `Cargo.toml`, and `assets/AppIcon.icns` (copied to `Contents/Resources/AppIcon.icns` to match `CFBundleIconFile`).
+`scripts/bundle.sh` drives `xcodebuild` for the Release configuration into a local `build/` derived-data path, then copies `Build/Products/Release/AppMonitor.app` to `target/release/bundle/AppMonitor.app` (the path `deploy_releases.sh` and `install.sh` expect). The Xcode build produces the executable, Info.plist (with `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` substituted via xcodebuild settings), and the compiled asset catalog (`Assets.car`) with the AppIcon ladder. Final ad-hoc signing happens via `codesign --force --deep --sign -`.

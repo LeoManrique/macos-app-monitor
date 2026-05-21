@@ -2,23 +2,22 @@
 set -euo pipefail
 
 # Releases a new version of App Monitor:
-#   1. Validates prerequisites (gh, cargo, codesign, git)
-#   2. Resolves / bumps version in Cargo.toml
+#   1. Validates prerequisites (gh, xcodebuild, codesign, git, xcodegen)
+#   2. Resolves / bumps version in project.yml
 #   3. Tags the release
-#   4. cargo build --release
-#   5. Bundles AppMonitor.app via scripts/bundle.sh
-#   6. Zips and uploads to GitHub Releases
+#   4. Bundles AppMonitor.app via scripts/bundle.sh (drives xcodebuild)
+#   5. Zips and uploads to GitHub Releases
 #
 # Usage: scripts/deploy_releases.sh [x.y.z]
-#   If a version is passed and it's higher than Cargo.toml's, the script bumps
-#   and commits Cargo.toml first so the tag points at the bump commit.
-#   Without an arg, uses whatever version is in Cargo.toml.
+#   If a version is passed and it's higher than project.yml's, the script
+#   bumps and commits project.yml first so the tag points at the bump commit.
+#   Without an arg, uses whatever version is in project.yml.
 
 # ── Colors ──
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
 
-TOTAL_STEPS=6
+TOTAL_STEPS=5
 REPO="LeoManrique/macos-app-monitor"
 step()    { echo -e "\n${BLUE}[$1/$TOTAL_STEPS]${NC} ${CYAN}$2${NC}"; }
 success() { echo -e "  ${GREEN}✓ $1${NC}"; }
@@ -34,12 +33,10 @@ VERSION="${1:-}"
 # ── Step 1: Validate prerequisites ──
 step 1 "Validating prerequisites"
 
-# This project is macOS-only — abort early on other hosts so the failure mode
-# isn't a confusing codesign / iconutil error halfway through.
 [ "$(uname -s)" = "Darwin" ] || error "This script only runs on macOS"
 [ "$(uname -m)" = "arm64" ]  || warn "Building on non-arm64; release target is Apple Silicon"
 
-for cmd in gh cargo codesign git zip; do
+for cmd in gh xcodebuild xcodegen codesign git zip; do
   command -v "$cmd" &>/dev/null || error "$cmd is not installed"
   success "$cmd found"
 done
@@ -48,36 +45,36 @@ gh auth status &>/dev/null || error "gh CLI not authenticated. Run: gh auth logi
 success "gh authenticated"
 
 # Working tree must be clean — otherwise we can't be sure what's in the tag.
-# (Cargo.lock churn is allowed since cargo build can touch it.)
 if ! git diff --quiet || ! git diff --cached --quiet; then
   error "Working tree is dirty — commit or stash changes before releasing"
 fi
 success "Working tree clean"
 
-# ── Step 2: Determine version ──
+# ── Step 2: Determine + bump version ──
 step 2 "Determining version"
 
-CURRENT_VERSION=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -1)
-[ -z "$CURRENT_VERSION" ] && error "Could not read version from Cargo.toml"
+CURRENT_VERSION=$(awk -F'"' '/^[[:space:]]*MARKETING_VERSION:/ {print $2; exit}' project.yml)
+[ -z "$CURRENT_VERSION" ] && error "Could not read MARKETING_VERSION from project.yml"
 
 if [ -z "$VERSION" ]; then
   VERSION="$CURRENT_VERSION"
-  success "Using version from Cargo.toml: $VERSION"
+  success "Using version from project.yml: $VERSION"
 else
   [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || error "Version must be x.y.z (got: $VERSION)"
   if [ "$VERSION" = "$CURRENT_VERSION" ]; then
-    success "Version $VERSION already in Cargo.toml, no bump needed"
+    success "Version $VERSION already in project.yml, no bump needed"
   else
     HIGHER=$(printf '%s\n%s\n' "$CURRENT_VERSION" "$VERSION" | sort -V | tail -1)
     [ "$HIGHER" = "$VERSION" ] || error "New version $VERSION is not greater than current $CURRENT_VERSION"
-    # sed -i.bak + rm is the portable form (works with both BSD and GNU sed).
-    # Match only the top-level [package] version line — match-once via the first
-    # `^version = "x.y.z"` we see (Cargo.toml has it on line 3, before deps).
-    sed -i.bak "0,/^version = \"$CURRENT_VERSION\"/s//version = \"$VERSION\"/" Cargo.toml
-    rm -f Cargo.toml.bak
-    # Touch Cargo.lock too so cargo updates the recorded version.
-    cargo update -p activity-monitor --precise "$VERSION" >/dev/null 2>&1 || true
-    git add Cargo.toml Cargo.lock
+    # Update both MARKETING_VERSION and CURRENT_PROJECT_VERSION in project.yml.
+    sed -i.bak \
+      -e "s/MARKETING_VERSION: \"$CURRENT_VERSION\"/MARKETING_VERSION: \"$VERSION\"/" \
+      -e "s/CURRENT_PROJECT_VERSION: \"$CURRENT_VERSION\"/CURRENT_PROJECT_VERSION: \"$VERSION\"/" \
+      project.yml
+    rm -f project.yml.bak
+    # Regenerate xcodeproj so its embedded settings line up before tagging.
+    xcodegen generate >/dev/null
+    git add project.yml AppMonitor.xcodeproj
     git commit -m "Bump version to $VERSION"
     git push
     success "Bumped $CURRENT_VERSION → $VERSION and pushed"
@@ -85,15 +82,13 @@ else
 fi
 
 TAG="v$VERSION"
-success "Version: $VERSION (tag: $TAG)"
-
 ARCH=$(uname -m)
 case "$ARCH" in
   arm64|aarch64) ARCH="arm64" ;;
   x86_64)        ARCH="amd64" ;;
 esac
 PLATFORM="macOS-$ARCH"
-success "Platform: $PLATFORM"
+success "Version: $VERSION (tag: $TAG), platform: $PLATFORM"
 
 # ── Step 3: Create git tag ──
 step 3 "Tagging release"
@@ -106,15 +101,8 @@ else
   success "Created and pushed tag $TAG"
 fi
 
-# ── Step 4: Build ──
-step 4 "Building release binary"
-
-cargo build --release
-[ -f "target/release/activity-monitor" ] || error "Build did not produce target/release/activity-monitor"
-success "Built target/release/activity-monitor"
-
-# ── Step 5: Bundle + zip ──
-step 5 "Bundling AppMonitor.app"
+# ── Step 4: Bundle + zip ──
+step 4 "Bundling AppMonitor.app"
 
 "$SCRIPT_DIR/bundle.sh" "$VERSION"
 APP_PATH="$PROJECT_ROOT/target/release/bundle/AppMonitor.app"
@@ -131,8 +119,8 @@ rm -f "$ARTIFACT_PATH"
 ditto -c -k --keepParent "$APP_PATH" "$ARTIFACT_PATH"
 success "Packaged: $ARTIFACT ($(du -h "$ARTIFACT_PATH" | cut -f1))"
 
-# ── Step 6: Upload to GitHub Release ──
-step 6 "Uploading to GitHub Release"
+# ── Step 5: Upload to GitHub Release ──
+step 5 "Uploading to GitHub Release"
 
 if gh release view "$TAG" --repo "$REPO" &>/dev/null; then
   warn "Release $TAG already exists, uploading artifacts (clobber)"
@@ -143,7 +131,7 @@ else
     --title "App Monitor $TAG" \
     --notes "## App Monitor $TAG
 
-A minimal GPUI alternative for macOS Activity Monitor's memory view, with processes grouped by \`.app\` so you can see how much memory you'd reclaim by quitting an app.
+A minimal SwiftUI alternative for macOS Activity Monitor's memory view, with processes grouped by \`.app\` so you can see how much memory you'd reclaim by quitting an app.
 
 ### Install
 

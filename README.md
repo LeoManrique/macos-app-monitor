@@ -1,6 +1,6 @@
 # macos-app-monitor
 
-Simple alternative for macOS Activity Monitor's, grouping processes by `.app` to visualize how much memory would be reclaimed by quitting a specific app. Built in GPUI.
+Simple alternative for macOS Activity Monitor, grouping processes by `.app` to visualize how much memory would be reclaimed by quitting a specific app. Built in SwiftUI.
 
 ## Install
 

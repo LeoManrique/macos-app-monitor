@@ -13,6 +13,8 @@
 - [x] Click column headers to change sort
 - [x] General stats (total memory / CPU / disk usage)
 - [x] App icons next to group names
+- [x] Ship as an ad-hoc-signed `.app` bundle (via `scripts/bundle.sh` + GitHub Releases)
+- [x] Migrate to SwiftUI (resident memory now lower than Apple's Activity Monitor)
 
 ## Next
 
@@ -20,5 +22,5 @@
 - [ ] Memory-over-time sparkline per app
 - [ ] Right-click "Quit" / "Force Quit"
 - [ ] Light theme + system-appearance follow
-- [ ] Ship as a signed `.app` bundle
 - [ ] Disk usage statistic (as in load)
+- [ ] Silence the SwiftUI `Table` reentrant-NSTableView-delegate warning

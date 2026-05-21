@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Builds AppMonitor.app from the release binary + assets/.
+# Builds AppMonitor.app from the Xcode project.
 # Output: $PROJECT_ROOT/target/release/bundle/AppMonitor.app
 # Usage:  scripts/bundle.sh [VERSION]
-#   VERSION defaults to Cargo.toml's [package].version.
+#   VERSION defaults to the project's MARKETING_VERSION (see project.yml).
+#   When set, both MARKETING_VERSION and CURRENT_PROJECT_VERSION are
+#   overridden for this build via xcodebuild settings.
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
@@ -17,52 +19,60 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT"
 
-# Resolve VERSION (arg → Cargo.toml).
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-  VERSION=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -1)
-  [ -z "$VERSION" ] && error "Could not read version from Cargo.toml"
+  # Pull from project.yml so callers without an explicit arg still get the
+  # right version baked into Info.plist.
+  VERSION=$(awk -F'"' '/^[[:space:]]*MARKETING_VERSION:/ {print $2; exit}' project.yml)
+  [ -z "$VERSION" ] && error "Could not read MARKETING_VERSION from project.yml"
 fi
 info "Bundling App Monitor $VERSION"
 
-# Locate required source assets.
-BINARY="target/release/activity-monitor"
-PLIST_SRC="assets/Info.plist"
-ICON_SRC="assets/AppIcon.icns"
-[ -f "$BINARY" ]    || error "Missing $BINARY — run 'cargo build --release' first"
-[ -f "$PLIST_SRC" ] || error "Missing $PLIST_SRC"
-[ -f "$ICON_SRC" ]  || error "Missing $ICON_SRC — drop the icns there before bundling"
+# Ensure the Xcode project is up to date. xcodegen is fast and idempotent;
+# running it every time keeps the project in sync with project.yml.
+if command -v xcodegen >/dev/null 2>&1; then
+  xcodegen generate >/dev/null
+  success "Regenerated AppMonitor.xcodeproj"
+else
+  [ -d "AppMonitor.xcodeproj" ] || error "xcodegen not installed and AppMonitor.xcodeproj missing — install xcodegen or commit the project"
+  warn "xcodegen not found; using existing AppMonitor.xcodeproj as-is"
+fi
 
-# Lay out the bundle from scratch each time so removed assets don't linger.
+# Build into a local DerivedData so the script is self-contained and
+# repeatable — no dependency on Xcode's global ~/Library cache.
+BUILD_DIR="$PROJECT_ROOT/build"
+rm -rf "$BUILD_DIR"
+xcodebuild \
+  -project AppMonitor.xcodeproj \
+  -scheme AppMonitor \
+  -configuration Release \
+  -destination 'platform=macOS' \
+  -derivedDataPath "$BUILD_DIR" \
+  MARKETING_VERSION="$VERSION" \
+  CURRENT_PROJECT_VERSION="$VERSION" \
+  build >/dev/null
+success "Built Release configuration"
+
+SRC_APP="$BUILD_DIR/Build/Products/Release/AppMonitor.app"
+[ -d "$SRC_APP" ] || error "xcodebuild did not produce $SRC_APP"
+
+# Lay out the canonical output path (consumed by deploy_releases.sh).
 BUNDLE_DIR="target/release/bundle"
-APP="$BUNDLE_DIR/AppMonitor.app"
-rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+DEST_APP="$BUNDLE_DIR/AppMonitor.app"
+rm -rf "$DEST_APP"
+mkdir -p "$BUNDLE_DIR"
+cp -R "$SRC_APP" "$DEST_APP"
+success "Copied AppMonitor.app to $DEST_APP"
 
-# Binary → Contents/MacOS/ under the CFBundleExecutable name.
-cp "$BINARY" "$APP/Contents/MacOS/activity-monitor"
-chmod +x "$APP/Contents/MacOS/activity-monitor"
-success "Copied binary"
-
-# Info.plist → fill in {{VERSION}}.
-sed "s/{{VERSION}}/$VERSION/g" "$PLIST_SRC" > "$APP/Contents/Info.plist"
-success "Wrote Info.plist (version $VERSION)"
-
-# Icon → Resources/. Filename must match CFBundleIconFile (no extension).
-cp "$ICON_SRC" "$APP/Contents/Resources/AppIcon.icns"
-success "Copied AppIcon.icns"
-
-# Ad-hoc sign. We don't have a Developer ID Application cert, so users will
-# need to bypass Gatekeeper (xattr -cr — install.sh does this automatically,
-# or right-click → Open on first launch). --force re-signs over any existing
-# signature; --deep covers nested resources even though we ship none today.
-if codesign --force --deep --sign - "$APP" 2>/dev/null; then
+# Ad-hoc sign. No Developer ID — users will need to bypass Gatekeeper
+# (xattr -cr — install.sh does this automatically, or right-click → Open
+# on first launch). --force re-signs over the Xcode default ad-hoc signature.
+if codesign --force --deep --sign - "$DEST_APP" 2>/dev/null; then
   success "Ad-hoc signed"
 else
   warn "codesign failed (continuing — bundle still usable with xattr -cr)"
 fi
 
-# Verify the bundle actually launches as an app (not just files in a folder).
-codesign --verify --verbose=2 "$APP" >/dev/null 2>&1 || warn "codesign --verify failed"
+codesign --verify --verbose=2 "$DEST_APP" >/dev/null 2>&1 || warn "codesign --verify failed"
 
-success "Built $APP"
+success "Built $DEST_APP"
