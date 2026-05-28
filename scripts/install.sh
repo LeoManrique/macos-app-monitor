@@ -75,7 +75,7 @@ step 3 "Fetching latest release from GitHub"
 RELEASE_JSON=$(curl -fsSL -H "Accept: application/vnd.github.v3+json" "$API_URL" 2>/dev/null) \
   || error "Failed to fetch release info from GitHub. Check your internet connection."
 
-TAG=$(echo "$RELEASE_JSON" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+TAG=$(echo "$RELEASE_JSON" | { grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' || true; } | head -1 | sed 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 [ -z "$TAG" ] && error "Could not parse release tag from GitHub API"
 
 VERSION="${TAG#v}"
@@ -85,7 +85,9 @@ success "Latest version: $VERSION (tag: $TAG)"
 step 4 "Downloading $APP_NAME"
 
 ARTIFACT="AppMonitor-$VERSION-$PLATFORM.zip"
-DOWNLOAD_URL=$(echo "$RELEASE_JSON" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*'"$ARTIFACT"'"' | head -1 | sed 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
+# `|| true` keeps a no-match from tripping `set -o pipefail` and aborting the
+# script silently before the explicit "not found" check below can run.
+DOWNLOAD_URL=$(echo "$RELEASE_JSON" | { grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*'"$ARTIFACT"'"' || true; } | head -1 | sed 's/.*"browser_download_url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')
 [ -z "$DOWNLOAD_URL" ] && error "Could not find artifact $ARTIFACT in release $TAG"
 
 rm -rf "$TMP_DIR"
