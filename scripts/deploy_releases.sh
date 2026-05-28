@@ -34,7 +34,8 @@ VERSION="${1:-}"
 step 1 "Validating prerequisites"
 
 [ "$(uname -s)" = "Darwin" ] || error "This script only runs on macOS"
-[ "$(uname -m)" = "arm64" ]  || warn "Building on non-arm64; release target is Apple Silicon"
+# Both arm64 and x86_64 are supported release platforms; uname just decides
+# which one this run produces.
 
 for cmd in gh xcodebuild xcodegen codesign git zip; do
   command -v "$cmd" &>/dev/null || error "$cmd is not installed"
@@ -143,7 +144,7 @@ Or download \`$ARTIFACT\` below and drag \`AppMonitor.app\` into \`/Applications
 
 ### Requirements
 
-- macOS 26 (Apple Silicon)"
+- macOS 14+ (Intel or Apple Silicon)"
 fi
 success "Uploaded $ARTIFACT to release $TAG"
 

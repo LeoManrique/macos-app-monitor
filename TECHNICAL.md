@@ -2,7 +2,7 @@
 
 ## Stack
 
-- **Swift 6** (strict concurrency), targeting **macOS 26 SDK**.
+- **Swift 6** (strict concurrency), built against the **macOS 26 SDK** with a **macOS 14 deployment target**.
 - **SwiftUI** for the UI: hierarchical `Table(_:children:)`, `KeyPathComparator` sort, native `CommandMenu`.
 - **`@Observable` model** (`ProcessMonitor`) running on `@MainActor`, sampled off-main via `Task.detached`.
 - No third-party Swift dependencies. All system access goes through `Darwin` / `AppKit`.
@@ -85,7 +85,7 @@ Sort changes flow through `onChange(of: sortOrder)` and are deferred one tick vi
 
 ## Building
 
-Requirements: macOS 26 (Apple Silicon), Xcode 26+, xcodegen (`brew install xcodegen`).
+Requirements to build: Xcode 26+ (for the macOS 26 SDK), xcodegen (`brew install xcodegen`). Runs on macOS 14+ (Intel or Apple Silicon).
 
 ```
 xcodegen generate                 # regenerate AppMonitor.xcodeproj from project.yml

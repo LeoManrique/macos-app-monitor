@@ -116,9 +116,16 @@ mv "$TMP_DIR/$APP_NAME" "$DEST"
 # dialog and won't open with a double-click. Stripping is the standard escape
 # hatch for open-source / unsigned tools.
 xattr -cr "$DEST" 2>/dev/null || true
+
+# Register with Launch Services so Spotlight, Launchpad, and `open -a "App
+# Monitor"` (by CFBundleName) resolve the freshly-unpacked bundle. Without
+# this, LS only learns about the app the first time Finder touches it.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+[ -x "$LSREGISTER" ] && "$LSREGISTER" -f "$DEST" >/dev/null 2>&1 || true
+
 success "Installed: $DEST"
 
 rm -rf "$TMP_DIR"
 
 echo -e "\n${GREEN}═══ App Monitor $VERSION installed ═══${NC}"
-echo -e "  ${CYAN}Open from /Applications, Spotlight, or:  open -a 'App Monitor'${NC}"
+echo -e "  ${CYAN}Open from /Applications, Spotlight, or:  open $DEST${NC}"

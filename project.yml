@@ -2,7 +2,7 @@ name: AppMonitor
 options:
   bundleIdPrefix: com.leonardomanrique
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "14.0"
   developmentLanguage: en
   createIntermediateGroups: true
 
@@ -11,7 +11,7 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_UPCOMING_FEATURE_INTERNAL_IMPORTS_BY_DEFAULT: NO
-    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
     PRODUCT_BUNDLE_IDENTIFIER: com.leonardomanrique.AppMonitor
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "0.1.0"
