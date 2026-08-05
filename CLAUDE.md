@@ -13,6 +13,8 @@ Before making non-trivial changes in this repo, pull current documentation via t
 
 Skip the lookup only for trivial edits (renames, comment-only changes, etc.).
 
+Suggest to upgrade libraries to user when available. Wait for their approval to proceed with the upgrade.
+
 ## Stack pointers
 
 - SwiftUI app generated via **xcodegen** from `project.yml`. Source under `AppMonitor/`.
@@ -30,3 +32,7 @@ After any major change, update the doc(s) that describe what changed. Don't defe
 - **`ROADMAP.md`** — move items from "Next" to "Done" when shipped; add new items as they come up. Don't mark them as Done until user tests the feature and reports them as completed.
 
 Never repeat information between them and keep them concise.
+
+# Visual testing
+
+Do not perform screenshots, ask user for visual feedback.
