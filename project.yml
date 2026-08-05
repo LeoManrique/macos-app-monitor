@@ -13,8 +13,8 @@ settings:
     SWIFT_UPCOMING_FEATURE_INTERNAL_IMPORTS_BY_DEFAULT: NO
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     PRODUCT_BUNDLE_IDENTIFIER: com.leonardomanrique.AppMonitor
-    MARKETING_VERSION: "0.1.1"
-    CURRENT_PROJECT_VERSION: "0.1.1"
+    MARKETING_VERSION: "0.1.2"
+    CURRENT_PROJECT_VERSION: "0.1.2"
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Manual
     # Ad-hoc by default so a plain `xcodebuild` works on any machine. Release
