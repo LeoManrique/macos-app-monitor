@@ -35,4 +35,4 @@ Never repeat information between them and keep them concise.
 
 # Visual testing
 
-Do not perform screenshots, ask user for visual feedback.
+Do not perform screenshots, ask user for visual feedback if needed.

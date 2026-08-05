@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.leonardomanrique.AppMonitor.helper</string>
+
+	<!-- App-bundle-relative path. SMAppService resolves BundleProgram against
+	     the containing app, so the daemon keeps working if the user moves
+	     AppMonitor.app. A plain Program key would hard-code an absolute path
+	     and break on the first move. -->
+	<key>BundleProgram</key>
+	<string>Contents/MacOS/AppMonitorHelper</string>
+
+	<!-- launchd owns the mach service name; the helper may only listen on it
+	     because it is declared here. Must match HelperWire.machServiceName. -->
+	<key>MachServices</key>
+	<dict>
+		<key>com.leonardomanrique.AppMonitor.helper</key>
+		<true/>
+	</dict>
+
+	<!-- On-demand: launchd starts the helper when the app first connects and
+	     lets it idle out afterwards. There is nothing to do between samples,
+	     so keeping a root process resident would be pure cost. -->
+	<key>KeepAlive</key>
+	<false/>
+	<key>RunAtLoad</key>
+	<false/>
+</dict>
+</plist>

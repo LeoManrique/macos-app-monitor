@@ -11,17 +11,34 @@ enum ProcessSampler {
         var out: [RawProcess] = []
         out.reserveCapacity(pids.count)
 
-        for pid in pids where pid > 0 {
+        // pid 0 is kernel_task, a genuine CPU consumer worth several percent of
+        // the machine. Root can read it, so it's included rather than filtered
+        // out; unprivileged we can resolve neither its counters nor its name,
+        // and the empty-name check below drops it.
+        for pid in pids where pid >= 0 {
             let name = processName(pid: pid)
+            // A process we can neither name nor measure is an empty row. In
+            // practice this only fires for pid 0 without privileges — every
+            // other unreadable process still resolves a name via proc_name or
+            // its executable path.
+            guard !name.isEmpty else { continue }
             let path = executablePath(pid: pid)
-            let (memory, cpu) = PhysFootprint.memoryAndCpu(pid: pid)
+            let (memory, cpuTicks, readable) = PhysFootprint.memoryAndCpu(pid: pid)
+            // Stamp the clock right here rather than once after the whole loop:
+            // enumerating ~800 pids spans several milliseconds, so a single
+            // post-hoc timestamp attributes the same elapsed window to the first
+            // and last process sampled. Reading it per-pid keeps each CPU delta
+            // paired with the exact instant its counter was read.
+            let at = mach_absolute_time()
             let resolvedMemory = memory ?? residentSize(pid: pid)
             out.append(RawProcess(
                 pid: pid,
                 name: name,
                 executablePath: path,
                 memoryBytes: resolvedMemory,
-                cpuTimeNanos: cpu
+                cpuTimeMachTicks: cpuTicks,
+                sampledAtMachTicks: at,
+                isReadable: readable
             ))
         }
         return out

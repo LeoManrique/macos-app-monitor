@@ -9,5 +9,9 @@ xcuserdata/
 *.xcuserdatad/
 DerivedData/
 
+# Python (scripts/)
+__pycache__/
+*.pyc
+
 # macOS
 .DS_Store

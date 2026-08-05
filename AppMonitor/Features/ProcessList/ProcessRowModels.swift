@@ -8,13 +8,20 @@ struct MonitoredProcess: Identifiable, Hashable {
     let name: String
     let memoryBytes: UInt64
     let cpuPercent: Double
+    /// False when the kernel refused to hand over this process's counters, so
+    /// `memoryBytes` and `cpuPercent` are placeholder zeros rather than
+    /// measurements. Kept separate from the values (instead of making them
+    /// optional) because `Table`'s `value:` key paths require `Comparable`,
+    /// which `Optional` is not — unknown rows sort as 0 and display as "—".
+    let isReadable: Bool
 
-    init(pid: Int32, name: String, memoryBytes: UInt64, cpuPercent: Double) {
+    init(pid: Int32, name: String, memoryBytes: UInt64, cpuPercent: Double, isReadable: Bool) {
         self.id = pid
         self.pid = pid
         self.name = name
         self.memoryBytes = memoryBytes
         self.cpuPercent = cpuPercent
+        self.isReadable = isReadable
     }
 }
 
@@ -33,6 +40,11 @@ struct AppGroup: Identifiable, Hashable {
     /// Indicates whether the group should render flat (no disclosure) or as a
     /// header with children. See `AppGroupBuilder` for the rule.
     let isFlat: Bool
+
+    /// True when at least one process in the group could be read. A partially
+    /// readable group still shows its totals — they're a real lower bound —
+    /// and only a group we couldn't read at all renders as "—".
+    var isReadable: Bool { processes.contains(where: \.isReadable) }
 }
 
 /// Single row type used by the hierarchical `Table`. Children must be the same
@@ -46,6 +58,9 @@ struct AppRow: Identifiable, Hashable {
     let bundlePath: String?
     let memory: UInt64
     let cpu: Double
+    /// False when `memory`/`cpu` are placeholders for counters the kernel
+    /// wouldn't give us — the cells render "—" instead of a misleading 0.
+    let isReadable: Bool
     var children: [AppRow]?
 }
 
@@ -60,6 +75,7 @@ extension AppGroup {
                 bundlePath: bundlePath,
                 memory: totalMemory,
                 cpu: totalCpu,
+                isReadable: isReadable,
                 children: nil
             )
         }
@@ -70,6 +86,7 @@ extension AppGroup {
             bundlePath: bundlePath,
             memory: totalMemory,
             cpu: totalCpu,
+            isReadable: isReadable,
             children: processes.map { proc in
                 AppRow(
                     id: "\(id)/\(proc.pid)",
@@ -78,6 +95,7 @@ extension AppGroup {
                     bundlePath: nil,
                     memory: proc.memoryBytes,
                     cpu: proc.cpuPercent,
+                    isReadable: proc.isReadable,
                     children: nil
                 )
             }

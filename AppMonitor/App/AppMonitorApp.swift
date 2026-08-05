@@ -12,8 +12,12 @@ struct AppMonitorApp: App {
                 .preferredColorScheme(.dark)
         }
         .defaultSize(defaultWindowSize())
+        // Compact chrome: the search field is the only toolbar item, so the
+        // full-height unified bar was mostly empty space above the table.
+        // Title moves inline beside the traffic lights.
+        .windowToolbarStyle(.unifiedCompact)
         .commands {
-            AppCommands()
+            AppCommands(monitor: monitor)
         }
     }
 

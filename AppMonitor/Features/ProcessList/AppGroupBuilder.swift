@@ -20,7 +20,8 @@ enum AppGroupBuilder {
                 pid: raw.pid,
                 name: raw.name,
                 memoryBytes: raw.memoryBytes,
-                cpuPercent: cpu
+                cpuPercent: cpu,
+                isReadable: raw.isReadable
             )
 
             let key: String

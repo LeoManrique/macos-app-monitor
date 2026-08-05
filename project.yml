@@ -17,8 +17,14 @@ settings:
     CURRENT_PROJECT_VERSION: "0.1.1"
     ENABLE_HARDENED_RUNTIME: YES
     CODE_SIGN_STYLE: Manual
+    # Ad-hoc by default so a plain `xcodebuild` works on any machine. Release
+    # bundles are re-signed with a Developer ID by scripts/bundle.py, which is
+    # what a LaunchDaemon-bearing app needs to be notarizable.
     CODE_SIGN_IDENTITY: "-"
-    DEVELOPMENT_TEAM: ""
+    # Team identifier, not the certificate id: an "Apple Development: … (XXXX)"
+    # common name carries the cert id in the parentheses, while the team is the
+    # OU field that `codesign -dv` reports as TeamIdentifier.
+    DEVELOPMENT_TEAM: 56VA234XZ8
     GENERATE_INFOPLIST_FILE: NO
     INFOPLIST_FILE: AppMonitor/Resources/Info.plist
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -33,5 +39,41 @@ targets:
       - path: AppMonitor
         excludes:
           - "Resources/Info.plist"
+      # SMAppService.daemon(plistName:) only looks in Contents/Library/LaunchDaemons.
+      - path: AppMonitorHelper/com.leonardomanrique.AppMonitor.helper.plist
+        buildPhase:
+          copyFiles:
+            destination: wrapper
+            subpath: Contents/Library/LaunchDaemons
     resources:
       - path: AppMonitor/Resources/Assets.xcassets
+    dependencies:
+      # Lands in Contents/MacOS/AppMonitorHelper, which is the path the
+      # LaunchDaemon plist's BundleProgram key points at.
+      - target: AppMonitorHelper
+        embed: true
+        codeSign: true
+        copy:
+          destination: executables
+
+  # Root sampler. Shares the sampling primitives with the app and adds nothing
+  # but an XPC listener — see AppMonitorHelper/main.swift.
+  AppMonitorHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: AppMonitorHelper
+        excludes:
+          - "*.plist"
+      - path: AppMonitor/Core/Sampling
+      - path: AppMonitor/Core/Helper/HelperWire.swift
+    settings:
+      base:
+        PRODUCT_NAME: AppMonitorHelper
+        PRODUCT_BUNDLE_IDENTIFIER: com.leonardomanrique.AppMonitor.helper
+        # The app's Info.plist must not be reused for the tool; generate a
+        # minimal one into the binary instead so it carries a bundle id.
+        GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        INFOPLIST_FILE: ""
+        SKIP_INSTALL: YES

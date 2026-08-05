@@ -9,37 +9,91 @@
 /* Begin PBXBuildFile section */
 		0A36E029C46AFC1B6D4E01DC /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0599B448B5361BAE94D9FDB /* ProcessMonitor.swift */; };
 		117012E090A9B0217A10BC4F /* SystemSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7DC9144353CDBE8387D040 /* SystemSampler.swift */; };
+		26568A68D29E5F48D64DC161 /* ProcessTerminator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44959E4CCF42DF2F41086917 /* ProcessTerminator.swift */; };
+		33BC3106C56E62DD63527D78 /* ProcessCPUSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3A4677B8994FB0198DFDDE /* ProcessCPUSampler.swift */; };
 		36E265C0A53A5ECEA129A161 /* AppMonitorApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5794FA64E9E020F063D03C1F /* AppMonitorApp.swift */; };
+		3742477848AAE4DF3F2E573B /* PhysFootprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48710A7CB4F2F242E744E5CE /* PhysFootprint.swift */; };
+		3E31600B44F6E5EA18E78408 /* com.leonardomanrique.AppMonitor.helper.plist in CopyFiles */ = {isa = PBXBuildFile; fileRef = 7A950BAAB17AF1A49FBEFF5D /* com.leonardomanrique.AppMonitor.helper.plist */; };
 		40432C6BD65DA5DB9BA951D9 /* AppIconLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BA00C0C3E66FDB85DF9484 /* AppIconLoader.swift */; };
+		4B169FC1E2A59167EA27D247 /* HelperWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A963F685427AE829A9337F3 /* HelperWire.swift */; };
 		4C031E8DBF8D03972870D3C6 /* StatusFooterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79DD3D3470E94A6FEA019182 /* StatusFooterView.swift */; };
 		51FE2CD929AFD29DB5C7312E /* SortState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C36CF00EF7712D9270791C4E /* SortState.swift */; };
 		57865B12D0550C824028E8BE /* AppBundleResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 029F5AE414307095D124C647 /* AppBundleResolver.swift */; };
 		5B6A6A363564209FAD11D7DE /* ProcessSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C288C4156D39CFD37AC8369 /* ProcessSampler.swift */; };
+		6007A0F2610BF0B50C86C37C /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38A88D5268073EE2B0E24D68 /* main.swift */; };
 		65632290F3D0E5599D0EB6FC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BAADF10E55E5B4BD9AFCA048 /* Assets.xcassets */; };
+		6C78889553EC2EF12C694F8F /* HelperClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8D9FD5BC624BB44302680DD /* HelperClient.swift */; };
+		7455034FA6CABEC47A51A572 /* HelperWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A963F685427AE829A9337F3 /* HelperWire.swift */; };
 		8816814517FEA33FB74A8617 /* ProcessRowModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60D80E0C19A3301AE12E3746 /* ProcessRowModels.swift */; };
 		881864FFA72E08E880D690B1 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = DED7A81F784554CFBAE2AFFC /* AppCommands.swift */; };
 		94C24B2FD411020ED87F6130 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = E88147B13DA02796148B8026 /* Formatters.swift */; };
 		A1B0348C80E599CD70300033 /* SystemStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1216D91DF1D0C4DA8A7F680E /* SystemStats.swift */; };
+		AC7BCC669F3DA2E345495043 /* SystemSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7DC9144353CDBE8387D040 /* SystemSampler.swift */; };
 		B120FD3A63AD07B3E4185DC7 /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73534862991D06F8B18FA47 /* Palette.swift */; };
 		B140C1C314177748EA607B2F /* ProcessListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6273A2B2F001D379C5209C5 /* ProcessListView.swift */; };
 		B7C40978C937FFF82AC57051 /* AppGroupBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2DACCF545B4E3701DC3AB6C /* AppGroupBuilder.swift */; };
+		CB5D386CC8FD4BCA0948EAB5 /* RowFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4264709FCD75BEE476E5185E /* RowFilter.swift */; };
+		D41AA893C8667371DC2FFDFF /* ProcessSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF979A48664826DCDA5C5A9 /* ProcessSnapshot.swift */; };
 		DE3EDD33BB0DD0EEF64FD214 /* ProcessCPUSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3A4677B8994FB0198DFDDE /* ProcessCPUSampler.swift */; };
+		E63B5EF30268B37757BA1226 /* ProcessSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C288C4156D39CFD37AC8369 /* ProcessSampler.swift */; };
+		E8BD0543D44D3F83DF45C531 /* AppMonitorHelper in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 73208AA1F68FCB06FD1431A8 /* AppMonitorHelper */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		EBD31D87F9FEDF7B44D54CFF /* PhysFootprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48710A7CB4F2F242E744E5CE /* PhysFootprint.swift */; };
 		FAD2924C031485ADAE053212 /* ProcessSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF979A48664826DCDA5C5A9 /* ProcessSnapshot.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		9DC8BBF97407BE5DEC9AAA26 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 80C333BDE3EA9F8F141CDFEC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3842EC989CEE5FA32C68669B;
+			remoteInfo = AppMonitorHelper;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		00328290EC66DD55ABAD5B6E /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 6;
+			files = (
+				E8BD0543D44D3F83DF45C531 /* AppMonitorHelper in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CD954399D3657F63B5DFAA38 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Library/LaunchDaemons;
+			dstSubfolderSpec = 1;
+			files = (
+				3E31600B44F6E5EA18E78408 /* com.leonardomanrique.AppMonitor.helper.plist in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		029F5AE414307095D124C647 /* AppBundleResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBundleResolver.swift; sourceTree = "<group>"; };
 		1216D91DF1D0C4DA8A7F680E /* SystemStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemStats.swift; sourceTree = "<group>"; };
+		38A88D5268073EE2B0E24D68 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		3F3A4677B8994FB0198DFDDE /* ProcessCPUSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessCPUSampler.swift; sourceTree = "<group>"; };
+		4264709FCD75BEE476E5185E /* RowFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowFilter.swift; sourceTree = "<group>"; };
+		44959E4CCF42DF2F41086917 /* ProcessTerminator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTerminator.swift; sourceTree = "<group>"; };
 		48710A7CB4F2F242E744E5CE /* PhysFootprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysFootprint.swift; sourceTree = "<group>"; };
 		4DF979A48664826DCDA5C5A9 /* ProcessSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSnapshot.swift; sourceTree = "<group>"; };
 		5794FA64E9E020F063D03C1F /* AppMonitorApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppMonitorApp.swift; sourceTree = "<group>"; };
 		60D80E0C19A3301AE12E3746 /* ProcessRowModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessRowModels.swift; sourceTree = "<group>"; };
 		6C288C4156D39CFD37AC8369 /* ProcessSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSampler.swift; sourceTree = "<group>"; };
 		6F7DC9144353CDBE8387D040 /* SystemSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSampler.swift; sourceTree = "<group>"; };
+		73208AA1F68FCB06FD1431A8 /* AppMonitorHelper */ = {isa = PBXFileReference; includeInIndex = 0; path = AppMonitorHelper; sourceTree = BUILT_PRODUCTS_DIR; };
 		79DD3D3470E94A6FEA019182 /* StatusFooterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusFooterView.swift; sourceTree = "<group>"; };
+		7A950BAAB17AF1A49FBEFF5D /* com.leonardomanrique.AppMonitor.helper.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = com.leonardomanrique.AppMonitor.helper.plist; sourceTree = "<group>"; };
+		7A963F685427AE829A9337F3 /* HelperWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperWire.swift; sourceTree = "<group>"; };
 		A0599B448B5361BAE94D9FDB /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
+		B8D9FD5BC624BB44302680DD /* HelperClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelperClient.swift; sourceTree = "<group>"; };
 		BAADF10E55E5B4BD9AFCA048 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C36CF00EF7712D9270791C4E /* SortState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SortState.swift; sourceTree = "<group>"; };
 		DED7A81F784554CFBAE2AFFC /* AppCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCommands.swift; sourceTree = "<group>"; };
@@ -68,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				F8AB90B2006CA869B0D50293 /* AppMonitor.app */,
+				73208AA1F68FCB06FD1431A8 /* AppMonitorHelper */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -84,6 +139,24 @@
 			path = Sampling;
 			sourceTree = "<group>";
 		};
+		24206FA0DB07A8E1918BE8AE /* Helper */ = {
+			isa = PBXGroup;
+			children = (
+				B8D9FD5BC624BB44302680DD /* HelperClient.swift */,
+				7A963F685427AE829A9337F3 /* HelperWire.swift */,
+			);
+			path = Helper;
+			sourceTree = "<group>";
+		};
+		36C5135FF5948FD2B93393B3 /* AppMonitorHelper */ = {
+			isa = PBXGroup;
+			children = (
+				7A950BAAB17AF1A49FBEFF5D /* com.leonardomanrique.AppMonitor.helper.plist */,
+				38A88D5268073EE2B0E24D68 /* main.swift */,
+			);
+			path = AppMonitorHelper;
+			sourceTree = "<group>";
+		};
 		41C93144F4027D302EC7168A /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -97,6 +170,7 @@
 			isa = PBXGroup;
 			children = (
 				072005649215E806322279BB /* AppMonitor */,
+				36C5135FF5948FD2B93393B3 /* AppMonitorHelper */,
 				08D9D137FF2E257A04538D67 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -117,6 +191,7 @@
 				F6273A2B2F001D379C5209C5 /* ProcessListView.swift */,
 				A0599B448B5361BAE94D9FDB /* ProcessMonitor.swift */,
 				60D80E0C19A3301AE12E3746 /* ProcessRowModels.swift */,
+				4264709FCD75BEE476E5185E /* RowFilter.swift */,
 				C36CF00EF7712D9270791C4E /* SortState.swift */,
 			);
 			path = ProcessList;
@@ -152,8 +227,10 @@
 			isa = PBXGroup;
 			children = (
 				C0CE99B0E53E19E825BBE3B0 /* AppBundles */,
+				24206FA0DB07A8E1918BE8AE /* Helper */,
 				D7F1C14905D6B2CDFA4B5B09 /* Icons */,
 				1FCA57D9C77449E706AE7A92 /* Sampling */,
+				CC4235E2EF42263D64ADA368 /* Termination */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -164,6 +241,14 @@
 				029F5AE414307095D124C647 /* AppBundleResolver.swift */,
 			);
 			path = AppBundles;
+			sourceTree = "<group>";
+		};
+		CC4235E2EF42263D64ADA368 /* Termination */ = {
+			isa = PBXGroup;
+			children = (
+				44959E4CCF42DF2F41086917 /* ProcessTerminator.swift */,
+			);
+			path = Termination;
 			sourceTree = "<group>";
 		};
 		D7F1C14905D6B2CDFA4B5B09 /* Icons */ = {
@@ -177,16 +262,36 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3842EC989CEE5FA32C68669B /* AppMonitorHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2674532C0382483D3F237C8E /* Build configuration list for PBXNativeTarget "AppMonitorHelper" */;
+			buildPhases = (
+				4FE4322876753D9CF4501A36 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AppMonitorHelper;
+			packageProductDependencies = (
+			);
+			productName = AppMonitorHelper;
+			productReference = 73208AA1F68FCB06FD1431A8 /* AppMonitorHelper */;
+			productType = "com.apple.product-type.tool";
+		};
 		5BDD0487C20F400E24E74D21 /* AppMonitor */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 888CE474B0AB2AE469193B66 /* Build configuration list for PBXNativeTarget "AppMonitor" */;
 			buildPhases = (
 				DB1D2731A6FEF85C331F5F04 /* Sources */,
 				479DDA29CD416428662DDAC3 /* Resources */,
+				CD954399D3657F63B5DFAA38 /* CopyFiles */,
+				00328290EC66DD55ABAD5B6E /* Embed Dependencies */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				EA4E52D89DBB1AB8DDE465D7 /* PBXTargetDependency */,
 			);
 			name = AppMonitor;
 			packageProductDependencies = (
@@ -204,14 +309,17 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					3842EC989CEE5FA32C68669B = {
+						DevelopmentTeam = 56VA234XZ8;
+						ProvisioningStyle = Manual;
+					};
 					5BDD0487C20F400E24E74D21 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = 56VA234XZ8;
 						ProvisioningStyle = Manual;
 					};
 				};
 			};
 			buildConfigurationList = F819F34FC825674D8B98066A /* Build configuration list for PBXProject "AppMonitor" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -221,10 +329,12 @@
 			mainGroup = 5091D0B8FAA990217FADF6AB;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 08D9D137FF2E257A04538D67 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				5BDD0487C20F400E24E74D21 /* AppMonitor */,
+				3842EC989CEE5FA32C68669B /* AppMonitorHelper */,
 			);
 		};
 /* End PBXProject section */
@@ -241,6 +351,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		4FE4322876753D9CF4501A36 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4B169FC1E2A59167EA27D247 /* HelperWire.swift in Sources */,
+				3742477848AAE4DF3F2E573B /* PhysFootprint.swift in Sources */,
+				33BC3106C56E62DD63527D78 /* ProcessCPUSampler.swift in Sources */,
+				E63B5EF30268B37757BA1226 /* ProcessSampler.swift in Sources */,
+				D41AA893C8667371DC2FFDFF /* ProcessSnapshot.swift in Sources */,
+				AC7BCC669F3DA2E345495043 /* SystemSampler.swift in Sources */,
+				6007A0F2610BF0B50C86C37C /* main.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DB1D2731A6FEF85C331F5F04 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -251,6 +375,8 @@
 				40432C6BD65DA5DB9BA951D9 /* AppIconLoader.swift in Sources */,
 				36E265C0A53A5ECEA129A161 /* AppMonitorApp.swift in Sources */,
 				94C24B2FD411020ED87F6130 /* Formatters.swift in Sources */,
+				6C78889553EC2EF12C694F8F /* HelperClient.swift in Sources */,
+				7455034FA6CABEC47A51A572 /* HelperWire.swift in Sources */,
 				B120FD3A63AD07B3E4185DC7 /* Palette.swift in Sources */,
 				EBD31D87F9FEDF7B44D54CFF /* PhysFootprint.swift in Sources */,
 				DE3EDD33BB0DD0EEF64FD214 /* ProcessCPUSampler.swift in Sources */,
@@ -259,6 +385,8 @@
 				8816814517FEA33FB74A8617 /* ProcessRowModels.swift in Sources */,
 				5B6A6A363564209FAD11D7DE /* ProcessSampler.swift in Sources */,
 				FAD2924C031485ADAE053212 /* ProcessSnapshot.swift in Sources */,
+				26568A68D29E5F48D64DC161 /* ProcessTerminator.swift in Sources */,
+				CB5D386CC8FD4BCA0948EAB5 /* RowFilter.swift in Sources */,
 				51FE2CD929AFD29DB5C7312E /* SortState.swift in Sources */,
 				4C031E8DBF8D03972870D3C6 /* StatusFooterView.swift in Sources */,
 				117012E090A9B0217A10BC4F /* SystemSampler.swift in Sources */,
@@ -267,6 +395,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		EA4E52D89DBB1AB8DDE465D7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3842EC989CEE5FA32C68669B /* AppMonitorHelper */;
+			targetProxy = 9DC8BBF97407BE5DEC9AAA26 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1017273BA11EF49319FD2FC1 /* Release */ = {
@@ -323,7 +459,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 0.1.1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 56VA234XZ8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -414,7 +550,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 0.1.1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 56VA234XZ8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -444,9 +580,54 @@
 			};
 			name = Release;
 		};
+		BB133AE9839ADABB7F22F4AD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.leonardomanrique.AppMonitor.helper;
+				PRODUCT_NAME = AppMonitorHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		DC22AA517C4C2E6ECFDC27A9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.leonardomanrique.AppMonitor.helper;
+				PRODUCT_NAME = AppMonitorHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		2674532C0382483D3F237C8E /* Build configuration list for PBXNativeTarget "AppMonitorHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DC22AA517C4C2E6ECFDC27A9 /* Debug */,
+				BB133AE9839ADABB7F22F4AD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		888CE474B0AB2AE469193B66 /* Build configuration list for PBXNativeTarget "AppMonitor" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
