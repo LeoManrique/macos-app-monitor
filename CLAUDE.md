@@ -4,8 +4,8 @@
 
 Before making non-trivial changes in this repo, pull current documentation via the **context7** MCP server or `WebFetch` against developer.apple.com. Built-in knowledge lags Apple's SDK churn.
 
-- **Swift 6** (strict concurrency). Resolve `swift` on context7 and fetch docs for whatever API you're touching — actor isolation, `Sendable` conformance, and the `Observable` macro have evolved each major release.
-- **SwiftUI / AppKit / Darwin libproc** (macOS 26 SDK). Always:
+- **Latest Swift version** (strict concurrency). Resolve `swift` on context7 and fetch docs for whatever API you're touching — actor isolation, `Sendable` conformance, and the `Observable` macro have evolved each major release.
+- **Latest SwiftUI / AppKit / Darwin libproc** (latest macOS SDK). Always:
   1. Identify the precise type/function you're using (`Table`, `KeyPathComparator`, `proc_pid_rusage`, `NSWorkspace`, etc.).
   2. Fetch its current docs before writing code that depends on its signature or behavior.
 
